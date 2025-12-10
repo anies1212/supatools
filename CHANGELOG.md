@@ -5,12 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.2] - 2025-12-10
+## [1.0.6] - 2025-12-10
 
 ### Fixed
 
-- Loosened analyzer range to stay compatible with build_runner/freezed toolchains while still allowing latest releases
-- Updated example dependencies to resolve build_runner formatting errors caused by analyzer incompatibility
+- Added CHANGELOG.md entries for all versions to satisfy pub.dev validation
+
+## [1.0.5] - 2025-12-10
+
+### Fixed
+
+- Fixed Dart formatting issues for pub.dev static analysis compliance
+- All source files now pass `dart format` check
 
 ## [1.0.4] - 2025-12-10
 
@@ -18,6 +24,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Formatted Dart sources to satisfy pub.dev static analysis checks
 - Bumped package version to align with latest release tag
+
+## [1.0.3] - 2025-12-10
+
+### Fixed
+
+- Fixed analyzer compatibility for build_runner integration
+
+## [1.0.2] - 2025-12-10
+
+### Fixed
+
+- Loosened analyzer range to stay compatible with build_runner/freezed toolchains while still allowing latest releases
+- Updated example dependencies to resolve build_runner formatting errors caused by analyzer incompatibility
 
 ## [1.0.1] - 2025-12-10
 

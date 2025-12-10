@@ -6,8 +6,9 @@ Generate [Freezed](https://pub.dev/packages/freezed) models from your Supabase d
 
 - Fetches table schema directly from Supabase PostgreSQL database
 - Generates type-safe Freezed models with `fromJson`/`toJson`
-- **build_runner integration** - runs before freezed/json_serializable
+- **CLI tool** for syncing schema changes
 - **Smart caching** - only regenerates when DB schema changes
+- **Relation embedding** - auto-detects foreign keys and embeds related models
 - **Flexible configuration** - supports `.env`, environment variables, and dart-define
 - Automatic PostgreSQL to Dart type mapping
 - Handles nullable fields, primary keys, and default values
@@ -52,16 +53,21 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SECRET_KEY=your-secret-key
 ```
 
-### 2. Run build_runner
+### 2. Generate models
 
 ```bash
+# Step 1: Fetch schema from Supabase and generate .supafreeze.dart files
+dart run supafreeze:supafreeze
+
+# Step 2: Run freezed/json_serializable to generate .freezed.dart and .g.dart files
 dart run build_runner build
 ```
 
 That's it! supafreeze will:
-1. Detect `supafreeze.yaml` and fetch your Supabase schema
-2. Generate individual model files in `lib/models/` (one file per table)
-3. Then freezed/json_serializable will generate `.freezed.dart` and `.g.dart` files
+1. Connect to your Supabase database
+2. Fetch the schema for all tables
+3. Generate `*.supafreeze.dart` files in `lib/models/`
+4. Then build_runner generates `.freezed.dart` and `.g.dart` files
 
 ### 3. Use the generated models
 
@@ -72,29 +78,79 @@ final user = Users(id: '123', name: 'John', createdAt: DateTime.now());
 final json = user.toJson();
 ```
 
-### 4. Subsequent builds
+### 4. When you modify the database schema
 
-On subsequent runs, supafreeze checks if the DB schema has changed:
-- **No changes**: Skips code generation (fast!)
-- **Schema changed**: Regenerates models with new schema
+Whenever you add, modify, or delete tables in Supabase:
 
 ```bash
-# This will be fast if schema hasn't changed
+# Sync latest schema from Supabase
+dart run supafreeze:supafreeze
+
+# Regenerate freezed/json_serializable code
 dart run build_runner build
 ```
 
+## CLI Tool
+
+The CLI tool is the primary way to sync your models with Supabase:
+
+```bash
+# Sync schema from Supabase (only generates changed models)
+dart run supafreeze:supafreeze
+
+# Force regenerate ALL models (ignores cache)
+dart run supafreeze:supafreeze --force
+dart run supafreeze:supafreeze -f
+```
+
+### How it works
+
+1. **Fetches schema** from Supabase via the OpenAPI spec endpoint
+2. **Compares** with locally cached schema to detect changes
+3. **Generates** only the modified `*.supafreeze.dart` files
+4. **Updates** the local cache
+
+After running the CLI, always run `dart run build_runner build` to generate the `.freezed.dart` and `.g.dart` files.
+
+### Why use the CLI tool?
+
+- **Explicit control**: You decide when to sync with Supabase
+- **Fast**: Only regenerates changed models
+- **Works offline**: Use cached schema when Supabase is unavailable
+- **CI/CD friendly**: Commit generated files and skip API calls in CI
+
 ## Configuration
 
-### Variable References
+### supafreeze.yaml
+
+```yaml
+# Required
+url: ${SUPABASE_URL}           # Supabase project URL
+secret_key: ${SUPABASE_SECRET_KEY}  # Supabase service role key
+
+# Optional
+output: lib/models             # Output directory (default: lib/models)
+schema: public                 # PostgreSQL schema (default: public)
+fetch: always                  # Fetch mode: always | if_no_cache | never
+generate_barrel: false         # Generate models.dart barrel file
+embed_relations: false         # Auto-embed related models via FK
+
+# Table filtering (use one or the other, not both)
+include:                       # Only generate these tables
+  - users
+  - posts
+exclude:                       # Skip these tables
+  - _migrations
+  - audit_logs
+```
+
+### Variable Resolution
 
 supafreeze supports multiple ways to reference sensitive values:
 
 ```yaml
-# supafreeze.yaml
-
 # Auto-resolve: checks dart-define > .env > environment variables
 url: ${SUPABASE_URL}
-secret_key: ${SUPABASE_SECRET_KEY}
 
 # Explicit environment variable
 url: $env{SUPABASE_URL}
@@ -103,112 +159,220 @@ url: $env{SUPABASE_URL}
 secret_key: $dotenv{SUPABASE_SECRET_KEY}
 ```
 
-### Priority Order
-
-Values are resolved in this order (highest priority first):
+**Priority order** (highest first):
 1. dart-define (`--dart-define=SUPABASE_SECRET_KEY=xxx`)
 2. `.env` file
 3. Environment variables
 
 ### Fetch Mode
 
-Control when supafreeze connects to Supabase:
-
-```yaml
-url: ${SUPABASE_URL}
-secret_key: ${SUPABASE_SECRET_KEY}
-output: lib/models
-
-# Options: always | if_no_cache | never
-fetch: if_no_cache
-```
-
 | Mode | Description |
 |------|-------------|
 | `always` | Always fetch from database (default) |
-| `if_no_cache` | Only fetch if no cache exists, otherwise use cache |
+| `if_no_cache` | Only fetch if no cache exists |
 | `never` | Never fetch, always use cache (offline mode) |
 
-**Use cases:**
-- `always`: Development with frequently changing schema
-- `if_no_cache`: CI/CD pipelines where schema is stable
-- `never`: Offline development or when Supabase is unavailable
+## GitHub Actions
 
-**Environment-based fetch mode:**
+### Recommended: Commit generated files
 
-You can use environment variables to switch fetch mode between local and CI:
+The simplest approach is to commit the generated `*.supafreeze.dart` files to your repository:
 
 ```yaml
-# supafreeze.yaml
-url: ${SUPABASE_URL}
-secret_key: ${SUPABASE_SECRET_KEY}
-output: lib/models
-fetch: ${SUPAFREEZE_FETCH}
+# .github/workflows/build.yml
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+
+      - run: flutter pub get
+
+      # Generated .supafreeze.dart files are already in the repo
+      # Just run build_runner for freezed/json_serializable
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests
+        run: flutter test
 ```
 
+**Local workflow:**
 ```bash
-# .env (local development)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SECRET_KEY=your-secret-key
-SUPAFREEZE_FETCH=always
+# When you change the database schema:
+dart run supafreeze:supafreeze
+dart run build_runner build
+git add lib/models/
+git commit -m "Update models from Supabase schema"
+git push
 ```
+
+### Alternative: Fetch from Supabase in CI
+
+If you want CI to fetch the latest schema:
 
 ```yaml
-# CI environment variables
-SUPAFREEZE_FETCH=never
+# .github/workflows/build.yml
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+
+      - run: flutter pub get
+
+      # Fetch schema from Supabase
+      - name: Sync Supabase schema
+        run: dart run supafreeze:supafreeze
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+
+      # Generate freezed/json_serializable code
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests
+        run: flutter test
 ```
 
-This allows you to fetch from DB locally while using cached schema in CI/CD.
+**Required secrets:**
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_SECRET_KEY`: Your Supabase service role key
 
-### Table Filtering
+### Alternative: Use cached schema in CI
 
-Include only specific tables:
+If you don't want to expose Supabase credentials in CI:
+
+```yaml
+# .github/workflows/build.yml
+name: Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+
+      # Cache supafreeze schema
+      - name: Cache supafreeze schema
+        uses: actions/cache@v4
+        with:
+          path: .dart_tool/supafreeze
+          key: supafreeze-${{ hashFiles('lib/models/*.supafreeze.dart') }}
+          restore-keys: |
+            supafreeze-
+
+      - run: flutter pub get
+
+      # Use cached schema (no API call)
+      - name: Sync schema (from cache)
+        run: dart run supafreeze:supafreeze
+        env:
+          SUPAFREEZE_FETCH: never
+
+      - name: Run build_runner
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests
+        run: flutter test
+```
+
+**Setup:**
+1. Run `dart run supafreeze:supafreeze` locally first
+2. Commit the `.dart_tool/supafreeze/` directory, or let the CI cache it after the first successful run
+
+To commit the cache:
+```bash
+# .gitignore
+.dart_tool/
+!.dart_tool/supafreeze/
+```
+
+## Relation Embedding
+
+supafreeze can auto-detect foreign key relationships from `*_id` columns and embed related models. **Disabled by default.**
+
+### Enable relation embedding
 
 ```yaml
 url: ${SUPABASE_URL}
 secret_key: ${SUPABASE_SECRET_KEY}
 output: lib/models
-
-include:
-  - users
-  - posts
-  - comments
+embed_relations: true
 ```
 
-Or exclude tables:
+### Generated output
 
-```yaml
-url: ${SUPABASE_URL}
-secret_key: ${SUPABASE_SECRET_KEY}
-output: lib/models
-
-exclude:
-  - _migrations
-  - schema_versions
-  - audit_logs
-```
-
-### Barrel File
-
-By default, supafreeze generates individual model files without a barrel file. If you want a barrel file that exports all models, enable it:
-
-```yaml
-url: ${SUPABASE_URL}
-secret_key: ${SUPABASE_SECRET_KEY}
-output: lib/models
-generate_barrel: true
-```
-
-This will generate `lib/models/models.dart`:
+When enabled, if a `posts` table has a `user_id` column and a `users` table exists:
 
 ```dart
-export 'users.supafreeze.dart';
-export 'posts.supafreeze.dart';
+// posts.supafreeze.dart (auto-generated)
+import 'users.supafreeze.dart';
+
+@freezed
+class Posts with _$Posts {
+  const factory Posts({
+    required String id,
+    required String title,
+    @JsonKey(name: 'user_id') required String userId,
+    Users? user,  // ← Auto-embedded from user_id FK
+  }) = _Posts;
+}
+```
+
+### Using with Supabase queries
+
+```dart
+// Fetch posts with embedded user
+final response = await supabase
+  .from('posts')
+  .select('*, user:users(*)');
+
+final posts = (response as List)
+  .map((json) => Posts.fromJson(json))
+  .toList();
+
+// Access the embedded user
+print(posts.first.user?.name);
+```
+
+### Disable specific relations
+
+```yaml
+embed_relations: true
+relations:
+  posts:
+    user: false      # Disable user embedding for posts table
+  comments:
+    author: false    # Disable author embedding for comments table
 ```
 
 ## Generated Output
 
-For tables like:
+For a table like:
 
 ```sql
 CREATE TABLE users (
@@ -218,15 +382,9 @@ CREATE TABLE users (
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-CREATE TABLE posts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT NOT NULL,
-  user_id UUID NOT NULL
-);
 ```
 
-supafreeze generates individual files in `lib/models/`:
+supafreeze generates:
 
 **`lib/models/users.supafreeze.dart`**
 ```dart
@@ -251,105 +409,6 @@ class Users with _$Users {
 }
 ```
 
-**`lib/models/posts.supafreeze.dart`**
-```dart
-// GENERATED CODE - DO NOT MODIFY BY HAND
-
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'posts.supafreeze.freezed.dart';
-part 'posts.supafreeze.g.dart';
-
-@freezed
-class Posts with _$Posts {
-  const factory Posts({
-    required String id,
-    required String title,
-    @JsonKey(name: 'user_id') required String userId,
-  }) = _Posts;
-
-  factory Posts.fromJson(Map<String, dynamic> json) => _$PostsFromJson(json);
-}
-```
-
-## How Caching Works
-
-supafreeze stores per-table hashes in `.dart_tool/supafreeze/`:
-- `table_hashes.json` - SHA256 hash for each table
-- `schema_cache.json` - Cached schema data
-
-### Per-Table Incremental Generation
-
-supafreeze tracks each table individually. When schema changes:
-- Only modified tables are regenerated
-- Unchanged tables are skipped
-- Deleted tables have their files automatically removed
-
-When you run build_runner with `fetch: always` (default):
-1. Fetches current schema from Supabase
-2. Computes hash for each table and compares with cached hashes
-3. Generates only changed/new tables, removes deleted tables
-4. Updates cache for affected tables
-
-**Important:** With `fetch: always`, API request occurs every time. To skip API requests entirely, use `fetch: if_no_cache` or `fetch: never`.
-
-### Using Cache in CI/CD (GitHub Actions)
-
-To use cached schema in CI without hitting Supabase API:
-
-```yaml
-# .github/workflows/build.yml
-name: Build
-
-on: [push, pull_request]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-
-      # Cache supafreeze schema
-      - name: Cache supafreeze schema
-        uses: actions/cache@v4
-        with:
-          path: .dart_tool/supafreeze
-          key: supafreeze-${{ hashFiles('.dart_tool/supafreeze/table_hashes.json') }}
-          restore-keys: |
-            supafreeze-
-
-      - run: flutter pub get
-
-      # Use fetch: never in CI to skip API requests
-      - name: Run build_runner
-        run: dart run build_runner build --delete-conflicting-outputs
-        env:
-          SUPAFREEZE_FETCH: never
-```
-
-**Workflow:**
-1. First, run `dart run build_runner build` locally with `fetch: always` to generate cache
-2. Commit `.dart_tool/supafreeze/` to your repository, or let CI cache it after the first run
-3. CI restores the cache and uses `fetch: never` to skip API requests
-
-**Alternative: Commit cache to repository**
-
-If you prefer not to rely on CI cache, you can commit the schema cache directly:
-
-```bash
-# .gitignore
-.dart_tool/
-
-# But keep supafreeze cache
-!.dart_tool/supafreeze/
-```
-
-This ensures CI always has access to the cached schema without needing Supabase credentials.
-
 ## Type Mapping
 
 | PostgreSQL | Dart |
@@ -363,18 +422,44 @@ This ensures CI always has access to the cached schema without needing Supabase 
 | `json`, `jsonb` | `Map<String, dynamic>` |
 | `text[]`, `int4[]`, etc. | `List<T>` |
 
+## Caching
+
+supafreeze stores per-table hashes in `.dart_tool/supafreeze/`:
+- `table_hashes.json` - SHA256 hash for each table
+- `schema_cache.json` - Full schema data
+
+When you run `dart run supafreeze:supafreeze`:
+1. Fetches current schema from Supabase
+2. Computes hash for each table
+3. Compares with cached hashes
+4. Generates only changed/new tables
+5. Removes files for deleted tables
+6. Updates cache
+
 ## Troubleshooting
 
 ### Schema fetch fails
 
-If supafreeze can't connect to Supabase, it will attempt to use the cached schema. If no cache exists, generation will be skipped.
+If supafreeze can't connect to Supabase, it will attempt to use the cached schema. If no cache exists, generation will fail.
+
+```bash
+# Use cached schema when offline
+SUPAFREEZE_FETCH=never dart run supafreeze:supafreeze
+```
 
 ### Force regeneration
 
-Delete the cache directory to force regeneration:
+```bash
+# Force regenerate all models
+dart run supafreeze:supafreeze --force
+dart run build_runner build
+```
+
+Or delete the cache:
 
 ```bash
 rm -rf .dart_tool/supafreeze
+dart run supafreeze:supafreeze
 dart run build_runner build
 ```
 
@@ -384,6 +469,15 @@ Make sure your `.env` file:
 - Is in the project root directory
 - Has no spaces around `=` signs
 - Values with spaces are quoted: `KEY="value with spaces"`
+
+### Models out of sync with Supabase
+
+Always run the CLI tool when you change your database schema:
+
+```bash
+dart run supafreeze:supafreeze
+dart run build_runner build
+```
 
 ## License
 

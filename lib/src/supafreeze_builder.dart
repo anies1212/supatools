@@ -21,7 +21,7 @@ class SupafreezeBuilder implements Builder {
 
   @override
   Map<String, List<String>> get buildExtensions => {
-    r'$lib$': ['supafreeze.intermediate.supafreeze.json'],
+    r'$lib$': ['supafreeze.intermediate.json'],
   };
 
   @override
@@ -66,7 +66,7 @@ class SupafreezeBuilder implements Builder {
   }
 
   Future<void> _writeEmptyOutput(BuildStep buildStep, AssetId inputId) async {
-    final outputId = AssetId(inputId.package, 'lib/supafreeze.intermediate.supafreeze.json');
+    final outputId = AssetId(inputId.package, 'lib/supafreeze.intermediate.json');
     await buildStep.writeAsString(outputId, '// No tables found or schema unchanged\n');
   }
 
@@ -217,6 +217,24 @@ class SupafreezeBuilder implements Builder {
     final generator = FreezedGenerator();
     final outputDir = config.output;
 
+    // Get all current tables for relation lookup
+    final allTables = await _getAllCurrentTables(outputDir, diff, cache);
+
+    // Configure generator with all tables and config for relation embedding
+    generator.setAllTables(allTables);
+    generator.setConfig(config);
+
+    // Log detected foreign keys if any
+    if (config.embedRelations) {
+      final fkCount = allTables.fold<int>(
+        0,
+        (sum, table) => sum + table.foreignKeys.length,
+      );
+      if (fkCount > 0) {
+        log.info('Detected $fkCount foreign key relationship(s).');
+      }
+    }
+
     final dir = Directory(outputDir);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
@@ -243,7 +261,6 @@ class SupafreezeBuilder implements Builder {
     }
 
     // Update full schema cache
-    final allTables = await _getAllCurrentTables(outputDir, diff, cache);
     await cache.cacheSchema(allTables);
 
     // Generate barrel file if enabled
@@ -257,7 +274,7 @@ class SupafreezeBuilder implements Builder {
     log.info('Generated ${diff.tablesToGenerate.length} model(s), removed ${diff.tablesToRemove.length} model(s)');
 
     // Write a marker file to satisfy build_runner output requirements
-    final outputId = AssetId(inputId.package, 'lib/supafreeze.intermediate.supafreeze.json');
+    final outputId = AssetId(inputId.package, 'lib/supafreeze.intermediate.json');
     await buildStep.writeAsString(
       outputId,
       '// Generated ${diff.tablesToGenerate.length}, removed ${diff.tablesToRemove.length}',

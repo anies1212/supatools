@@ -4,7 +4,7 @@ builders:
     builder_factories: ["supafreezeBuilder"]
     build_extensions:
       "$lib$":
-        - "supafreeze.intermediate.supafreeze.json"
+        - "supafreeze.intermediate.json"
     auto_apply: root_package
     build_to: cache
     runs_before:

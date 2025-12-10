@@ -173,6 +173,11 @@ class SchemaCache {
     await _saveTableHashes(currentHashes);
   }
 
+  /// Clears all table hashes (forces regeneration of all tables)
+  Future<void> clearTableHashes() async {
+    await _saveTableHashes({});
+  }
+
   /// Caches the full schema for later use
   Future<void> cacheSchema(List<TableInfo> tables) async {
     final dir = Directory(cacheDir);

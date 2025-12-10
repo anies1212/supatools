@@ -1,6 +1,32 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+/// Represents a foreign key relationship
+class ForeignKeyInfo {
+  /// The column in this table that holds the foreign key
+  final String column;
+
+  /// The referenced table name
+  final String referencedTable;
+
+  /// The referenced column (usually 'id')
+  final String referencedColumn;
+
+  /// Whether this is a one-to-one or many-to-one relationship
+  final bool isOneToOne;
+
+  const ForeignKeyInfo({
+    required this.column,
+    required this.referencedTable,
+    required this.referencedColumn,
+    this.isOneToOne = false,
+  });
+
+  @override
+  String toString() =>
+      'ForeignKeyInfo($column -> $referencedTable.$referencedColumn)';
+}
+
 /// Represents a column in a database table
 class ColumnInfo {
   final String name;
@@ -9,17 +35,31 @@ class ColumnInfo {
   final String? defaultValue;
   final bool isPrimaryKey;
 
+  /// Foreign key reference if this column is a foreign key
+  final ForeignKeyInfo? foreignKey;
+
   const ColumnInfo({
     required this.name,
     required this.dataType,
     required this.isNullable,
     this.defaultValue,
     this.isPrimaryKey = false,
+    this.foreignKey,
   });
+
+  /// Creates a copy with updated foreign key info
+  ColumnInfo copyWith({ForeignKeyInfo? foreignKey}) => ColumnInfo(
+    name: name,
+    dataType: dataType,
+    isNullable: isNullable,
+    defaultValue: defaultValue,
+    isPrimaryKey: isPrimaryKey,
+    foreignKey: foreignKey ?? this.foreignKey,
+  );
 
   @override
   String toString() =>
-      'ColumnInfo(name: $name, dataType: $dataType, isNullable: $isNullable, isPrimaryKey: $isPrimaryKey)';
+      'ColumnInfo(name: $name, dataType: $dataType, isNullable: $isNullable, isPrimaryKey: $isPrimaryKey, fk: $foreignKey)';
 }
 
 /// Represents a database table
@@ -31,6 +71,16 @@ class TableInfo {
     required this.name,
     required this.columns,
   });
+
+  /// Gets all foreign key relationships in this table
+  List<ForeignKeyInfo> get foreignKeys =>
+      columns.where((c) => c.foreignKey != null).map((c) => c.foreignKey!).toList();
+
+  /// Creates a copy with updated columns
+  TableInfo copyWith({List<ColumnInfo>? columns}) => TableInfo(
+    name: name,
+    columns: columns ?? this.columns,
+  );
 
   @override
   String toString() => 'TableInfo(name: $name, columns: $columns)';
@@ -205,6 +255,9 @@ class SchemaFetcher {
     // Track detected enums for reference
     final detectedEnums = <String, List<String>>{};
 
+    // Extract foreign key relationships from OpenAPI spec
+    final foreignKeys = _extractForeignKeys(spec);
+
     for (final entry in definitions.entries) {
       final tableName = entry.key;
       final tableSchema = entry.value as Map<String, dynamic>;
@@ -230,12 +283,17 @@ class SchemaFetcher {
           dataType = _openApiTypeToPgType(columnSchema);
         }
 
+        // Check if this column has a foreign key relationship
+        final fkKey = '$tableName.$columnName';
+        final foreignKey = foreignKeys[fkKey];
+
         columns.add(
           ColumnInfo(
             name: columnName,
             dataType: dataType,
             isNullable: !required.contains(columnName),
             defaultValue: columnSchema['default']?.toString(),
+            foreignKey: foreignKey,
           ),
         );
       }
@@ -247,9 +305,108 @@ class SchemaFetcher {
 
     // Store detected enums for logging/debugging
     _lastDetectedEnums = detectedEnums;
+    _lastDetectedForeignKeys = foreignKeys;
 
     return tables;
   }
+
+  /// Extracts foreign key relationships from OpenAPI spec
+  ///
+  /// PostgREST OpenAPI spec includes relationship info in the paths
+  /// under the "parameters" section with "in: query" and names like "select"
+  /// that reference embedded resources.
+  Map<String, ForeignKeyInfo> _extractForeignKeys(Map<String, dynamic> spec) {
+    final foreignKeys = <String, ForeignKeyInfo>{};
+
+    // Method 1: Parse from definitions - look for column naming patterns
+    final definitions =
+        spec['definitions'] as Map<String, dynamic>? ??
+        spec['components']?['schemas'] as Map<String, dynamic>? ??
+        {};
+
+    // Build a set of all table names for reference detection
+    final tableNames = definitions.keys.toSet();
+
+    for (final entry in definitions.entries) {
+      final tableName = entry.key;
+      final tableSchema = entry.value as Map<String, dynamic>;
+      final properties =
+          tableSchema['properties'] as Map<String, dynamic>? ?? {};
+
+      for (final propEntry in properties.entries) {
+        final columnName = propEntry.key;
+        final columnSchema = propEntry.value as Map<String, dynamic>;
+
+        // Detect FK by column naming convention: xxx_id -> xxx table
+        if (columnName.endsWith('_id') && columnName != 'id') {
+          final potentialTable = columnName.substring(0, columnName.length - 3);
+
+          // Check if a table with this name exists (singular or plural forms)
+          final referencedTable = _findReferencedTable(potentialTable, tableNames);
+
+          if (referencedTable != null) {
+            final format = columnSchema['format'] as String?;
+            final type = columnSchema['type'] as String?;
+
+            // Verify it's likely a foreign key type (uuid, int, bigint)
+            if (_isForeignKeyType(type, format)) {
+              foreignKeys['$tableName.$columnName'] = ForeignKeyInfo(
+                column: columnName,
+                referencedTable: referencedTable,
+                referencedColumn: 'id',
+              );
+            }
+          }
+        }
+      }
+    }
+
+    return foreignKeys;
+  }
+
+  /// Finds a referenced table by name, checking singular/plural forms
+  String? _findReferencedTable(String baseName, Set<String> tableNames) {
+    // Direct match
+    if (tableNames.contains(baseName)) return baseName;
+
+    // Plural forms
+    final plurals = [
+      '${baseName}s',           // user -> users
+      '${baseName}es',          // box -> boxes
+      baseName.endsWith('y')
+          ? '${baseName.substring(0, baseName.length - 1)}ies'  // category -> categories
+          : null,
+    ].whereType<String>();
+
+    for (final plural in plurals) {
+      if (tableNames.contains(plural)) return plural;
+    }
+
+    // Singular from plural (if baseName is already plural)
+    if (baseName.endsWith('s')) {
+      final singular = baseName.substring(0, baseName.length - 1);
+      if (tableNames.contains(singular)) return singular;
+    }
+
+    return null;
+  }
+
+  /// Checks if a type is typically used for foreign keys
+  bool _isForeignKeyType(String? type, String? format) {
+    if (format == 'uuid') return true;
+    if (format == 'int64' || format == 'bigint') return true;
+    if (format == 'int32' || format == 'integer') return true;
+    if (type == 'integer') return true;
+    if (type == 'string' && format == 'uuid') return true;
+    return false;
+  }
+
+  /// Last detected foreign keys from OpenAPI parsing
+  Map<String, ForeignKeyInfo> _lastDetectedForeignKeys = {};
+
+  /// Gets the foreign keys detected in the last schema fetch
+  Map<String, ForeignKeyInfo> get detectedForeignKeys =>
+      Map.unmodifiable(_lastDetectedForeignKeys);
 
   /// Last detected enums from OpenAPI parsing (for debugging)
   Map<String, List<String>> _lastDetectedEnums = {};

@@ -1,4 +1,5 @@
 import 'package:recase/recase.dart';
+import 'config_loader.dart';
 import 'schema_fetcher.dart';
 import 'type_mapper.dart';
 
@@ -28,6 +29,31 @@ class FreezedGenerator {
   /// File extension for generated files (without leading dot)
   static const String fileExtension = 'supafreeze';
 
+  /// All tables in the schema (used for relation lookups)
+  final Map<String, TableInfo> _allTables = {};
+
+  /// Configuration for relation embedding
+  SupafreezeConfig? _config;
+
+  /// Sets all tables for relation lookup
+  void setAllTables(List<TableInfo> tables) {
+    _allTables.clear();
+    for (final table in tables) {
+      _allTables[table.name] = table;
+    }
+  }
+
+  /// Sets the configuration for relation embedding
+  void setConfig(SupafreezeConfig config) {
+    _config = config;
+  }
+
+  /// Gets the class name for a table
+  String getClassName(String tableName) {
+    final rawClassName = ReCase(tableName).pascalCase;
+    return _escapeClassName(rawClassName);
+  }
+
   /// Generates a Freezed model file content for a single table
   String generateModel(TableInfo table) {
     final rawClassName = ReCase(table.name).pascalCase;
@@ -45,6 +71,13 @@ class FreezedGenerator {
 
     // Imports
     buffer.writeln("import 'package:freezed_annotation/freezed_annotation.dart';");
+
+    // Add imports for related models
+    final relatedImports = _getRelatedImports(table);
+    for (final import in relatedImports) {
+      buffer.writeln("import '$import';");
+    }
+
     buffer.writeln();
     buffer.writeln("part '$fileName.$fileExtension.freezed.dart';");
     buffer.writeln("part '$fileName.$fileExtension.g.dart';");
@@ -62,6 +95,12 @@ class FreezedGenerator {
       buffer.writeln('    $fieldLine');
     }
 
+    // Add embedded relation fields
+    final relationFields = _generateRelationFields(table);
+    for (final field in relationFields) {
+      buffer.writeln('    $field');
+    }
+
     buffer.writeln('  }) = _$className;');
     buffer.writeln();
 
@@ -73,6 +112,76 @@ class FreezedGenerator {
     buffer.writeln('}');
 
     return buffer.toString();
+  }
+
+  /// Gets imports needed for related models
+  Set<String> _getRelatedImports(TableInfo table) {
+    final imports = <String>{};
+
+    if (_config?.embedRelations != true) return imports;
+
+    for (final column in table.columns) {
+      final fk = column.foreignKey;
+      if (fk == null) continue;
+
+      // Get relation name from FK column (e.g., user_id -> user)
+      final relationName = _getRelationName(column.name);
+
+      // Check if this relation should be embedded
+      if (_config?.shouldEmbedRelation(table.name, relationName) != true) {
+        continue;
+      }
+
+      // Check if the referenced table exists
+      if (!_allTables.containsKey(fk.referencedTable)) continue;
+
+      final relatedFileName = ReCase(fk.referencedTable).snakeCase;
+      imports.add('$relatedFileName.$fileExtension.dart');
+    }
+
+    return imports;
+  }
+
+  /// Generates embedded relation fields for a table
+  List<String> _generateRelationFields(TableInfo table) {
+    final fields = <String>[];
+
+    if (_config?.embedRelations != true) return fields;
+
+    for (final column in table.columns) {
+      final fk = column.foreignKey;
+      if (fk == null) continue;
+
+      // Get relation name from FK column (e.g., user_id -> user)
+      final relationName = _getRelationName(column.name);
+
+      // Check if this relation should be embedded
+      if (_config?.shouldEmbedRelation(table.name, relationName) != true) {
+        continue;
+      }
+
+      // Check if the referenced table exists
+      final referencedTable = _allTables[fk.referencedTable];
+      if (referencedTable == null) continue;
+
+      // Generate the relation field
+      final relatedClassName = getClassName(fk.referencedTable);
+      final fieldName = _escapeFieldName(relationName);
+
+      // Relations are always nullable (might not be fetched)
+      fields.add('$relatedClassName? $fieldName,');
+    }
+
+    return fields;
+  }
+
+  /// Gets the relation name from a foreign key column name
+  /// e.g., user_id -> user, author_id -> author
+  String _getRelationName(String columnName) {
+    if (columnName.endsWith('_id')) {
+      return ReCase(columnName.substring(0, columnName.length - 3)).camelCase;
+    }
+    return ReCase(columnName).camelCase;
   }
 
   /// Sorts columns: required fields first, then grouped by Dart type

@@ -24,3 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Property sorting (required first, grouped by type)
 - snake_case to camelCase conversion with `@JsonKey` annotations
 - Support for nullable fields, primary keys, and default values
+- **Relation embedding** - Auto-detect FK from `*_id` columns and embed related models
+- Per-table relation configuration with `relations` option
+- Dart reserved word escaping for field and class names
+- Custom enum type detection from OpenAPI spec
+- **CLI tool** (`dart run supafreeze:supafreeze`) for manual schema sync
+- `--force` flag to regenerate all models regardless of cache

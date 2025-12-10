@@ -41,8 +41,21 @@
 /// - [TypeMapper] - Maps PostgreSQL types to Dart types
 library;
 
-export 'src/config_loader.dart' show ConfigLoader, SupafreezeConfig, FetchMode, ConfigException, RelationConfig, RelationOverride;
-export 'src/schema_fetcher.dart' show SchemaFetcher, TableInfo, ColumnInfo, ForeignKeyInfo, SchemaFetchException;
+export 'src/config_loader.dart'
+    show
+        ConfigLoader,
+        SupafreezeConfig,
+        FetchMode,
+        ConfigException,
+        RelationConfig,
+        RelationOverride;
+export 'src/schema_fetcher.dart'
+    show
+        SchemaFetcher,
+        TableInfo,
+        ColumnInfo,
+        ForeignKeyInfo,
+        SchemaFetchException;
 export 'src/type_mapper.dart' show TypeMapper;
 export 'src/freezed_generator.dart' show FreezedGenerator;
 export 'src/schema_cache.dart' show SchemaCache, SchemaDiff;

@@ -1,0 +1,12 @@
+builders:
+  supafreeze:
+    import: "package:supafreeze/builder.dart"
+    builder_factories: ["supafreezeBuilder"]
+    build_extensions:
+      "$lib$":
+        - "supafreeze.intermediate.supafreeze.json"
+    auto_apply: root_package
+    build_to: cache
+    runs_before:
+      - freezed
+      - json_serializable

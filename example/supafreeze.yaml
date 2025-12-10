@@ -1,0 +1,7 @@
+# supafreeze configuration
+url: ${SUPABASE_URL}
+secret_key: ${SUPABASE_SECRET_KEY}
+output: lib/models
+schema: public
+fetch: always
+# generate_barrel: false

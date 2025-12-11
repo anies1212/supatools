@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/packages/supabase_schema_core/melos_supabase_schema_core.iml" filepath="$PROJECT_DIR$/packages/supabase_schema_core/melos_supabase_schema_core.iml" />
+      <module fileurl="file://$PROJECT_DIR$/packages/supafreeze/melos_supafreeze.iml" filepath="$PROJECT_DIR$/packages/supafreeze/melos_supafreeze.iml" />
+      <module fileurl="file://$PROJECT_DIR$/packages/suparepo/melos_suparepo.iml" filepath="$PROJECT_DIR$/packages/suparepo/melos_suparepo.iml" />
+      <module fileurl="file://$PROJECT_DIR$/melos_supatools_workspace.iml" filepath="$PROJECT_DIR$/melos_supatools_workspace.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/supafreeze.iml" filepath="$PROJECT_DIR$/.idea/supafreeze.iml" />
+    </modules>
+  </component>
+</project>

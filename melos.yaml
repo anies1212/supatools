@@ -1,0 +1,44 @@
+name: supatools
+
+packages:
+  - packages/*
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  analyze:
+    run: dart analyze .
+    exec:
+      concurrency: 1
+    description: Analyze all packages
+
+  format:
+    run: dart format .
+    exec:
+      concurrency: 1
+    description: Format all packages
+
+  test:
+    run: dart test
+    exec:
+      concurrency: 1
+      failFast: true
+    packageFilters:
+      dirExists: test
+    description: Run tests in all packages
+
+  publish:dry:
+    run: dart pub publish --dry-run
+    exec:
+      concurrency: 1
+      orderDependents: true
+    description: Dry run publish for all packages
+
+  publish:
+    run: dart pub publish --force
+    exec:
+      concurrency: 1
+      orderDependents: true
+    description: Publish all packages (in dependency order)

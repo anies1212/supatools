@@ -25,7 +25,7 @@ dependencies:
   json_annotation: ^4.8.0
 
 dev_dependencies:
-  supafreeze: ^1.0.4
+  supafreeze: ^2.0.0
   build_runner: ^2.4.0
   freezed: ^2.4.0
   json_serializable: ^6.7.0

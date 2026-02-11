@@ -88,6 +88,45 @@ class TableInfo {
   String toString() => 'TableInfo(name: $name, columns: $columns)';
 }
 
+/// Represents a parameter for an RPC function
+class RpcParamInfo {
+  final String name;
+  final String dataType;
+  final bool isRequired;
+
+  const RpcParamInfo({
+    required this.name,
+    required this.dataType,
+    this.isRequired = true,
+  });
+
+  @override
+  String toString() =>
+      'RpcParamInfo($name: $dataType, required: $isRequired)';
+}
+
+/// Represents a Supabase RPC (SQL) function
+class RpcFunctionInfo {
+  final String name;
+  final List<RpcParamInfo> params;
+  final String returnType;
+  final bool returnsSetOf;
+  final String? description;
+
+  const RpcFunctionInfo({
+    required this.name,
+    required this.params,
+    required this.returnType,
+    this.returnsSetOf = false,
+    this.description,
+  });
+
+  @override
+  String toString() =>
+      'RpcFunctionInfo($name, params: $params, '
+      'returns: ${returnsSetOf ? 'setof ' : ''}$returnType)';
+}
+
 /// Fetches schema information from Supabase
 class SchemaFetcher {
   final String supabaseUrl;
@@ -204,8 +243,8 @@ class SchemaFetcher {
     return jsonDecode(response.body);
   }
 
-  /// Fetches schema via OpenAPI spec (fallback method)
-  Future<List<TableInfo>> _fetchViaOpenApi() async {
+  /// Fetches the raw OpenAPI spec JSON from Supabase
+  Future<Map<String, dynamic>> _fetchOpenApiSpec() async {
     final url = Uri.parse('$supabaseUrl/rest/v1/');
 
     final response = await http.get(
@@ -224,8 +263,8 @@ class SchemaFetcher {
       );
     }
 
-    // Parse OpenAPI response to extract table info
-    final openApiUrl = Uri.parse('$supabaseUrl/rest/v1/?apikey=$supabaseKey');
+    final openApiUrl =
+        Uri.parse('$supabaseUrl/rest/v1/?apikey=$supabaseKey');
     final openApiResponse = await http.get(
       openApiUrl,
       headers: {
@@ -236,7 +275,7 @@ class SchemaFetcher {
     );
 
     if (openApiResponse.statusCode == 200) {
-      return _parseOpenApiSpec(jsonDecode(openApiResponse.body));
+      return jsonDecode(openApiResponse.body) as Map<String, dynamic>;
     }
 
     throw SchemaFetchException(
@@ -244,6 +283,120 @@ class SchemaFetcher {
       statusCode: openApiResponse.statusCode,
       responseBody: openApiResponse.body,
     );
+  }
+
+  /// Fetches schema via OpenAPI spec (fallback method)
+  Future<List<TableInfo>> _fetchViaOpenApi() async {
+    final spec = await _fetchOpenApiSpec();
+    return _parseOpenApiSpec(spec);
+  }
+
+  /// Fetches RPC function definitions from the OpenAPI spec
+  Future<List<RpcFunctionInfo>> fetchRpcFunctions() async {
+    final spec = await _fetchOpenApiSpec();
+    return parseRpcFunctions(spec);
+  }
+
+  /// Parses RPC functions from OpenAPI spec paths
+  List<RpcFunctionInfo> parseRpcFunctions(
+    Map<String, dynamic> spec,
+  ) {
+    final paths = spec['paths'] as Map<String, dynamic>? ?? {};
+    final functions = <RpcFunctionInfo>[];
+
+    for (final entry in paths.entries) {
+      final path = entry.key;
+      if (!path.startsWith('/rpc/')) continue;
+
+      final funcName = path.substring('/rpc/'.length);
+      if (funcName.isEmpty) continue;
+
+      final pathSpec = entry.value as Map<String, dynamic>;
+      final postSpec =
+          pathSpec['post'] as Map<String, dynamic>? ?? {};
+
+      final description =
+          postSpec['description'] as String?;
+
+      // Parse parameters
+      final params = _parseRpcParams(postSpec);
+
+      // Parse return type
+      final (returnType, returnsSetOf) =
+          _parseRpcReturnType(postSpec);
+
+      functions.add(RpcFunctionInfo(
+        name: funcName,
+        params: params,
+        returnType: returnType,
+        returnsSetOf: returnsSetOf,
+        description: description,
+      ));
+    }
+
+    return functions;
+  }
+
+  /// Parses RPC function parameters from the post spec
+  List<RpcParamInfo> _parseRpcParams(
+    Map<String, dynamic> postSpec,
+  ) {
+    final params = <RpcParamInfo>[];
+    final parameters =
+        postSpec['parameters'] as List<dynamic>? ?? [];
+
+    for (final param in parameters) {
+      final paramMap = param as Map<String, dynamic>;
+      final inLocation = paramMap['in'] as String?;
+
+      if (inLocation == 'body') {
+        final schema =
+            paramMap['schema'] as Map<String, dynamic>? ?? {};
+        final properties =
+            schema['properties'] as Map<String, dynamic>? ?? {};
+        final required =
+            (schema['required'] as List?)?.cast<String>() ?? [];
+
+        for (final propEntry in properties.entries) {
+          final propSchema =
+              propEntry.value as Map<String, dynamic>;
+          final pgType = _openApiTypeToPgType(propSchema);
+
+          params.add(RpcParamInfo(
+            name: propEntry.key,
+            dataType: pgType,
+            isRequired: required.contains(propEntry.key),
+          ));
+        }
+      }
+    }
+
+    return params;
+  }
+
+  /// Parses RPC function return type from the post spec
+  (String, bool) _parseRpcReturnType(
+    Map<String, dynamic> postSpec,
+  ) {
+    final responses =
+        postSpec['responses'] as Map<String, dynamic>? ?? {};
+    final okResponse =
+        responses['200'] as Map<String, dynamic>? ?? {};
+    final schema =
+        okResponse['schema'] as Map<String, dynamic>? ?? {};
+
+    if (schema.isEmpty) return ('void', false);
+
+    final type = schema['type'] as String?;
+
+    if (type == 'array') {
+      final items =
+          schema['items'] as Map<String, dynamic>? ?? {};
+      final itemType = _openApiTypeToPgType(items);
+      return (itemType, true);
+    }
+
+    return (_openApiTypeToPgType(schema), false);
   }
 
   /// Parses OpenAPI specification to extract table information

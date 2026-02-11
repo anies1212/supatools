@@ -8,7 +8,7 @@ A monorepo containing Dart packages for Supabase code generation.
 |---------|-------------|---------|
 | [supabase_schema_core](packages/supabase_schema_core) | Internal package for schema fetching and type mapping | [![pub](https://img.shields.io/pub/v/supabase_schema_core.svg)](https://pub.dev/packages/supabase_schema_core) |
 | [supafreeze](packages/supafreeze) | Generate Freezed models from Supabase schema | [![pub](https://img.shields.io/pub/v/supafreeze.svg)](https://pub.dev/packages/supafreeze) |
-| [suparepo](packages/suparepo) | Generate repository/data access code from Supabase schema | [![pub](https://img.shields.io/pub/v/suparepo.svg)](https://pub.dev/packages/suparepo) |
+| [suparepo](packages/suparepo) | Generate repositories, RPC clients, and Edge Function clients | [![pub](https://img.shields.io/pub/v/suparepo.svg)](https://pub.dev/packages/suparepo) |
 
 ## Quick Start
 
@@ -20,11 +20,16 @@ dart pub add supafreeze
 
 See [supafreeze README](packages/supafreeze/README.md) for details.
 
-### Generate Repository Code
+### Generate Repositories, RPC & Edge Function Clients
 
 ```bash
 dart pub add suparepo
 ```
+
+suparepo generates:
+- **Table repositories** — CRUD operations, pagination, relation queries
+- **RPC clients** — Type-safe methods for Supabase SQL functions
+- **Edge Function clients** — Typed or untyped clients for Edge Functions
 
 See [suparepo README](packages/suparepo/README.md) for details.
 

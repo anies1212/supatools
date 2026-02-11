@@ -2,7 +2,7 @@ name: suparepo
 description: >-
   Generate repository/data access layer code from Supabase database schema.
   Automatically creates CRUD operations, queries, and type-safe API clients.
-version: 1.0.0
+version: 1.1.0
 homepage: https://github.com/anies1212/supatools
 repository: https://github.com/anies1212/supatools/tree/main/packages/suparepo
 issue_tracker: https://github.com/anies1212/supatools/issues
@@ -25,6 +25,9 @@ dependencies:
   yaml: ^3.1.2
   path: ^1.9.0
   recase: ^4.1.0
+
+executables:
+  suparepo: suparepo
 
 dev_dependencies:
   lints: ^6.0.0

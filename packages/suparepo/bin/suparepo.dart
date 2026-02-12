@@ -160,7 +160,10 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
   );
 
   final generator = RpcGenerator();
-  final content = generator.generateRpcClient(filtered);
+  final content = generator.generateRpcClient(
+    filtered,
+    supabaseImport: config.supabaseImport,
+  );
 
   final outputPath =
       config.rpc.output ?? p.join(config.output, 'rpc_client.dart');
@@ -202,6 +205,7 @@ Future<int> _generateEdgeFunctionClient(
   final content = generator.generateEdgeFunctionClient(
     filtered,
     modelDefs: config.edgeFunctions.models,
+    supabaseImport: config.supabaseImport,
   );
 
   final outputPath = config.edgeFunctions.output ??

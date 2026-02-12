@@ -1,5 +1,6 @@
 import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
+import 'config_loader.dart';
 
 /// Dart reserved words that need escaping in parameter names
 const Set<String> _dartReservedWords = {
@@ -19,7 +20,10 @@ const Set<String> _dartReservedWords = {
 /// Generates a Supabase RPC client class from RPC function info
 class RpcGenerator {
   /// Generates the full RPC client file content
-  String generateRpcClient(List<RpcFunctionInfo> functions) {
+  String generateRpcClient(
+    List<RpcFunctionInfo> functions, {
+    String supabaseImport = defaultSupabaseImport,
+  }) {
     final buffer = StringBuffer();
 
     // Header
@@ -28,9 +32,7 @@ class RpcGenerator {
     buffer.writeln();
 
     // Import
-    buffer.writeln(
-      "import 'package:supabase_flutter/supabase_flutter.dart';",
-    );
+    buffer.writeln("import '$supabaseImport';");
     buffer.writeln();
 
     // Class definition

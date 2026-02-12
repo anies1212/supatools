@@ -7,9 +7,13 @@ class RepositoryGenerator {
   /// Configuration for generation
   SuparepoConfig? _config;
 
+  /// Supabase package import path
+  String _supabaseImport = defaultSupabaseImport;
+
   /// Sets the configuration
   void setConfig(SuparepoConfig config) {
     _config = config;
+    _supabaseImport = config.supabaseImport;
   }
 
   /// Gets the class name for a table's model
@@ -52,7 +56,7 @@ class RepositoryGenerator {
     buffer.writeln();
 
     // Imports
-    buffer.writeln("import 'package:supabase_flutter/supabase_flutter.dart';");
+    buffer.writeln("import '$_supabaseImport';");
     if (_config?.modelImportPath != null) {
       buffer.writeln("import '${_config!.modelImportPath}';");
     }

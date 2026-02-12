@@ -227,6 +227,7 @@ schema: public
 fetch: always                # always | if_no_cache | never
 generate_barrel: true
 model_import_path: package:myapp/models/models.dart
+supabase_import: package:supabase_flutter/supabase_flutter.dart  # or package:supabase/supabase.dart for pure Dart
 
 # Table filter (for repository generation)
 include: [users, posts]

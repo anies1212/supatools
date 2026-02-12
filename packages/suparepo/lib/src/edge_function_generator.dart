@@ -1,4 +1,5 @@
 import 'package:recase/recase.dart';
+import 'config_loader.dart';
 import 'edge_function_info.dart';
 
 /// Generates a Supabase Edge Function client class
@@ -10,6 +11,7 @@ class EdgeFunctionGenerator {
   String generateEdgeFunctionClient(
     List<EdgeFunctionInfo> functions, {
     Map<String, EdgeFunctionModelDef>? modelDefs,
+    String supabaseImport = defaultSupabaseImport,
   }) {
     final buffer = StringBuffer();
 
@@ -19,9 +21,7 @@ class EdgeFunctionGenerator {
     buffer.writeln();
 
     // Imports
-    buffer.writeln(
-      "import 'package:supabase_flutter/supabase_flutter.dart';",
-    );
+    buffer.writeln("import '$supabaseImport';");
 
     // Check if any function has model definitions
     final hasModels = modelDefs != null &&

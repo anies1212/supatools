@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-02-12
+
+### Added
+
+- **Configurable Supabase import** (`supabase_import`)
+  - Allows switching between `package:supabase_flutter/supabase_flutter.dart` (default) and `package:supabase/supabase.dart` for pure Dart packages
+  - Applied to all generators: repository, RPC client, and Edge Function client
+
 ## [1.1.0] - 2026-02-11
 
 ### Added

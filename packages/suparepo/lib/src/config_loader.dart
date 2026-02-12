@@ -38,6 +38,8 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       ),
       generateBarrel: yaml['generate_barrel'] == true,
       modelImportPath: yaml['model_import_path']?.toString(),
+      supabaseImport: yaml['supabase_import']?.toString() ??
+          defaultSupabaseImport,
       rpc: _parseRpcConfig(yaml['rpc']),
       edgeFunctions: _parseEdgeFunctionConfig(
         yaml['edge_functions'],
@@ -169,12 +171,24 @@ class EdgeFunctionConfig {
   }
 }
 
+/// Default Supabase import for Flutter projects
+const defaultSupabaseImport =
+    'package:supabase_flutter/supabase_flutter.dart';
+
+/// Supabase import for pure Dart projects
+const pureDartSupabaseImport = 'package:supabase/supabase.dart';
+
 /// Configuration for suparepo
 class SuparepoConfig extends BaseSupabaseConfig {
   final bool generateBarrel;
 
   /// Import path for model classes
   final String? modelImportPath;
+
+  /// Supabase package import path used in generated code.
+  /// Defaults to 'package:supabase_flutter/supabase_flutter.dart'.
+  /// Use 'package:supabase/supabase.dart' for pure Dart packages.
+  final String supabaseImport;
 
   /// RPC function generation config
   final RpcConfig rpc;
@@ -192,6 +206,7 @@ class SuparepoConfig extends BaseSupabaseConfig {
     super.fetch = FetchMode.always,
     this.generateBarrel = false,
     this.modelImportPath,
+    this.supabaseImport = defaultSupabaseImport,
     this.rpc = const RpcConfig(),
     this.edgeFunctions = const EdgeFunctionConfig(),
   });

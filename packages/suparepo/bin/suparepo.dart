@@ -125,7 +125,20 @@ Future<int> _generateRepositories(
     print('✨ Generated: $filePath');
   }
 
-  return files.length;
+  var count = files.length;
+
+  // Generate supabase_client_provider.dart at custom path if specified
+  if (config.generateProviders &&
+      config.clientProviderOutput != null) {
+    final content = generator.generateSupabaseClientProvider();
+    final outputFile = File(config.clientProviderOutput!);
+    await outputFile.parent.create(recursive: true);
+    await outputFile.writeAsString(content);
+    print('✨ Generated: ${config.clientProviderOutput}');
+    count++;
+  }
+
+  return count;
 }
 
 Future<int> _generateRpcClient(SuparepoConfig config) async {
@@ -164,6 +177,7 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     filtered,
     supabaseImport: config.supabaseImport,
     generateProviders: config.generateProviders,
+    clientProviderImport: config.clientProviderImport,
   );
 
   final outputPath =

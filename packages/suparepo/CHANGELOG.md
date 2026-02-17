@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.3] - 2026-02-18
+
+### Added
+
+- `client_provider_output` — カスタム出力パスで `supabase_client_provider.dart` を任意の場所に生成可能に
+- `client_provider_import` — 生成コード内のプロバイダー import パスをカスタマイズ可能に
+
 ## [1.3.2] - 2026-02-18
 
 ### Fixed

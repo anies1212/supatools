@@ -42,6 +42,10 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       supabaseImport: yaml['supabase_import']?.toString() ??
           defaultSupabaseImport,
       generateProviders: yaml['generate_providers'] == true,
+      clientProviderOutput:
+          yaml['client_provider_output']?.toString(),
+      clientProviderImport:
+          yaml['client_provider_import']?.toString(),
       rpc: _parseRpcConfig(yaml['rpc']),
       edgeFunctions: _parseEdgeFunctionConfig(
         yaml['edge_functions'],
@@ -203,6 +207,17 @@ class SuparepoConfig extends BaseSupabaseConfig {
   /// provider function, and a `supabase_client_provider.dart` is generated.
   final bool generateProviders;
 
+  /// Custom output path for `supabase_client_provider.dart`.
+  /// When set, the file is written to this path instead of `{output}/`.
+  /// Example: `../gateway/lib/supabase/supabase_client_provider.dart`
+  final String? clientProviderOutput;
+
+  /// Custom import path for `supabase_client_provider.dart` in generated code.
+  /// When set, repositories and RPC client use this import instead of
+  /// a relative import.
+  /// Example: `package:gateway/supabase/supabase_client_provider.dart`
+  final String? clientProviderImport;
+
   /// RPC function generation config
   final RpcConfig rpc;
 
@@ -222,6 +237,8 @@ class SuparepoConfig extends BaseSupabaseConfig {
     this.modelImportPrefix,
     this.supabaseImport = defaultSupabaseImport,
     this.generateProviders = false,
+    this.clientProviderOutput,
+    this.clientProviderImport,
     this.rpc = const RpcConfig(),
     this.edgeFunctions = const EdgeFunctionConfig(),
   });
@@ -241,6 +258,8 @@ SuparepoConfig:
   modelImportPath: ${modelImportPath ?? 'none'}
   modelImportPrefix: ${modelImportPrefix ?? 'none'}
   generateProviders: $generateProviders
+  clientProviderOutput: ${clientProviderOutput ?? 'none'}
+  clientProviderImport: ${clientProviderImport ?? 'none'}
   rpc.enabled: ${rpc.enabled}
   edgeFunctions.enabled: ${edgeFunctions.enabled}
 ''';

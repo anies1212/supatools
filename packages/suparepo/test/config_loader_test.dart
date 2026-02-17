@@ -143,6 +143,31 @@ edge_functions:
       expect(sendEmail.response![1].isRequired, isFalse);
     });
 
+    test('client_provider_output/importのパース', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+generate_providers: true
+client_provider_output: ../gateway/lib/supabase/supabase_client_provider.dart
+client_provider_import: package:gateway/supabase/supabase_client_provider.dart
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      expect(config!.generateProviders, isTrue);
+      expect(
+        config.clientProviderOutput,
+        '../gateway/lib/supabase/supabase_client_provider.dart',
+      );
+      expect(
+        config.clientProviderImport,
+        'package:gateway/supabase/supabase_client_provider.dart',
+      );
+    });
+
     test('デフォルト値の適用', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
@@ -157,6 +182,9 @@ secret_key: test-secret-key-long-enough
       expect(config!.output, 'lib/repositories');
       expect(config.schema, 'public');
       expect(config.generateBarrel, isFalse);
+      expect(config.generateProviders, isFalse);
+      expect(config.clientProviderOutput, isNull);
+      expect(config.clientProviderImport, isNull);
       expect(config.rpc.enabled, isFalse);
       expect(config.rpc.output, isNull);
       expect(config.rpc.include, isNull);

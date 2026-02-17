@@ -246,6 +246,19 @@ SupabaseClient supabaseClient(Ref ref) {
 }
 ```
 
+#### Custom Provider Output Path
+
+By default, `supabase_client_provider.dart` is generated in the same directory as repositories. To output it to a different location (e.g., a Gateway package), use `client_provider_output` and `client_provider_import`:
+
+```yaml
+generate_providers: true
+client_provider_output: ../gateway/lib/supabase/supabase_client_provider.dart
+client_provider_import: package:gateway/supabase/supabase_client_provider.dart
+```
+
+- `client_provider_output` — File path where `supabase_client_provider.dart` is written
+- `client_provider_import` — Import path used in generated repository/RPC code to reference the provider
+
 ### Model Import Options
 
 There are two ways to link generated repositories to supafreeze models:
@@ -272,6 +285,8 @@ schema: public
 fetch: always                # always | if_no_cache | never
 generate_barrel: false       # Generate barrel file for repositories (default: false)
 generate_providers: true     # Generate Riverpod providers (default: false)
+client_provider_output: ../gateway/lib/supabase/supabase_client_provider.dart  # Custom output path
+client_provider_import: package:gateway/supabase/supabase_client_provider.dart # Custom import path
 model_import_path: package:myapp/models/models.dart       # Barrel file import
 model_import_prefix: package:myapp/                       # Individual file import (takes precedence)
 supabase_import: package:supabase_flutter/supabase_flutter.dart  # or package:supabase/supabase.dart for pure Dart

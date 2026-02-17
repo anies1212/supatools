@@ -24,6 +24,7 @@ class RpcGenerator {
     List<RpcFunctionInfo> functions, {
     String supabaseImport = defaultSupabaseImport,
     bool generateProviders = false,
+    String? clientProviderImport,
   }) {
     final buffer = StringBuffer();
 
@@ -53,7 +54,9 @@ class RpcGenerator {
     buffer.writeln("import '$supabaseImport';");
     if (generateProviders) {
       buffer.writeln();
-      buffer.writeln("import 'supabase_client_provider.dart';");
+      final providerImport =
+          clientProviderImport ?? 'supabase_client_provider.dart';
+      buffer.writeln("import '$providerImport';");
       buffer.writeln();
       buffer.writeln("part 'rpc_client.g.dart';");
     }

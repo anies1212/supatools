@@ -242,5 +242,35 @@ void main() {
         contains("import 'package:supabase_flutter/supabase_flutter.dart'"),
       );
     });
+
+    test('clientProviderImport指定時にカスタムimportを使用', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'test_func',
+          params: [],
+          returnType: 'void',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateProviders: true,
+        clientProviderImport:
+            'package:gateway/supabase/supabase_client_provider.dart',
+      );
+
+      expect(
+        output,
+        contains(
+          "import 'package:gateway/supabase/"
+          "supabase_client_provider.dart'",
+        ),
+      );
+      expect(
+        output,
+        isNot(contains("import 'supabase_client_provider.dart'")),
+      );
+    });
   });
 }

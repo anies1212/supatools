@@ -88,7 +88,7 @@ class FreezedGenerator {
 
     // Class definition
     buffer.writeln('@freezed');
-    buffer.writeln('class $className with _\$$className {');
+    buffer.writeln('abstract class $className with _\$$className {');
     buffer.writeln('  const factory $className({');
 
     // Fields (sorted: required first, then grouped by type)
@@ -425,7 +425,7 @@ class FreezedGenerator {
     final buffer = StringBuffer();
 
     buffer.writeln('@freezed');
-    buffer.writeln('class $className with _\$$className {');
+    buffer.writeln('abstract class $className with _\$$className {');
     buffer.writeln('  const factory $className({');
 
     final sortedColumns = _sortColumns(table.columns);

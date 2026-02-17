@@ -23,7 +23,7 @@ void main() {
 
         final result = generator.generateModel(table);
 
-        expect(result, contains("class Users with _\$Users"));
+        expect(result, contains("abstract class Users with _\$Users"));
         expect(result, contains("required String id"));
         expect(result, contains("required String name"));
         expect(result, contains("String? email"));
@@ -84,7 +84,7 @@ void main() {
 
         final result = generator.generateModel(table);
 
-        expect(result, contains('class Table123Data'));
+        expect(result, contains('abstract class Table123Data'));
       });
 
       test('sorts columns with required first', () {
@@ -137,7 +137,7 @@ void main() {
 
         final result = generator.generateModel(table);
 
-        expect(result, contains('class ClassModel'));
+        expect(result, contains('abstract class ClassModel'));
       });
     });
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1] - 2026-02-18
+
+### Fixed
+
+- Tightened `supabase_schema_core` lower bound to `^1.1.0` (fixes downgrade analysis)
+- Added example file for pub.dev scoring
+- Updated README with `generate_providers` and `model_import_prefix` documentation
+
 ## [1.3.0] - 2026-02-18
 
 ### Added

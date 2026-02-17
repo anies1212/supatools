@@ -163,6 +163,7 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
   final content = generator.generateRpcClient(
     filtered,
     supabaseImport: config.supabaseImport,
+    generateProviders: config.generateProviders,
   );
 
   final outputPath =

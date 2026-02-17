@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0] - 2026-02-18
+
+### Added
+
+- **Riverpod provider generation** (`generate_providers`)
+  - Optionally generates `@Riverpod(keepAlive: true)` providers for each repository and RPC client
+  - Generates `supabase_client_provider.dart` for SupabaseClient DI
+  - Controlled by `generate_providers: true` in `suparepo.yaml`
+- **Individual model import prefix** (`model_import_prefix`)
+  - Import each model file individually instead of a barrel file
+  - e.g. `model_import_prefix: package:data/` imports `package:data/categories.supafreeze.dart`
+
+### Fixed
+
+- Fixed `count()` method to use correct Supabase SDK API (`.select().count(CountOption.exact)`)
+- Added `ignore_for_file` directives to suppress lint warnings in generated code
+- Fixed required parameters ordering in RPC client methods
+
 ## [1.2.0] - 2026-02-12
 
 ### Added

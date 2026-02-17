@@ -38,8 +38,10 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       ),
       generateBarrel: yaml['generate_barrel'] == true,
       modelImportPath: yaml['model_import_path']?.toString(),
+      modelImportPrefix: yaml['model_import_prefix']?.toString(),
       supabaseImport: yaml['supabase_import']?.toString() ??
           defaultSupabaseImport,
+      generateProviders: yaml['generate_providers'] == true,
       rpc: _parseRpcConfig(yaml['rpc']),
       edgeFunctions: _parseEdgeFunctionConfig(
         yaml['edge_functions'],
@@ -182,13 +184,24 @@ const pureDartSupabaseImport = 'package:supabase/supabase.dart';
 class SuparepoConfig extends BaseSupabaseConfig {
   final bool generateBarrel;
 
-  /// Import path for model classes
+  /// Import path for model classes (barrel file).
+  /// If set, all repositories import this single path.
   final String? modelImportPath;
+
+  /// Import prefix for individual model files.
+  /// When set, each repository imports `{prefix}{table_name}.supafreeze.dart`.
+  /// Takes precedence over [modelImportPath].
+  final String? modelImportPrefix;
 
   /// Supabase package import path used in generated code.
   /// Defaults to 'package:supabase_flutter/supabase_flutter.dart'.
   /// Use 'package:supabase/supabase.dart' for pure Dart packages.
   final String supabaseImport;
+
+  /// Whether to generate Riverpod providers for repositories and RPC client.
+  /// When enabled, each repository file includes a `@Riverpod(keepAlive: true)`
+  /// provider function, and a `supabase_client_provider.dart` is generated.
+  final bool generateProviders;
 
   /// RPC function generation config
   final RpcConfig rpc;
@@ -206,7 +219,9 @@ class SuparepoConfig extends BaseSupabaseConfig {
     super.fetch = FetchMode.always,
     this.generateBarrel = false,
     this.modelImportPath,
+    this.modelImportPrefix,
     this.supabaseImport = defaultSupabaseImport,
+    this.generateProviders = false,
     this.rpc = const RpcConfig(),
     this.edgeFunctions = const EdgeFunctionConfig(),
   });
@@ -224,6 +239,8 @@ SuparepoConfig:
   exclude: ${exclude ?? 'none'}
   generateBarrel: $generateBarrel
   modelImportPath: ${modelImportPath ?? 'none'}
+  modelImportPrefix: ${modelImportPrefix ?? 'none'}
+  generateProviders: $generateProviders
   rpc.enabled: ${rpc.enabled}
   edgeFunctions.enabled: ${edgeFunctions.enabled}
 ''';

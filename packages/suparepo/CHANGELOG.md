@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2] - 2026-02-18
+
+### Fixed
+
+- RPC client: void 戻り値の関数で未使用の `response` 変数を除去
+- RPC client: `rpc()` に明示的な型引数を追加し `inference_failure_on_function_invocation` を解消
+
 ## [1.3.1] - 2026-02-18
 
 ### Fixed

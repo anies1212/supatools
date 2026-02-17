@@ -132,9 +132,13 @@ class RpcGenerator {
     buffer.writeln(') async {');
 
     // Method body
+    final isVoid = dartReturnType == 'void';
+    final prefix = isVoid ? '    await' : '    final response = await';
+    final typeArg = isVoid ? 'void' : 'dynamic';
+
     if (func.params.isNotEmpty) {
       buffer.write(
-        "    final response = await _client.rpc('${func.name}', "
+        "$prefix _client.rpc<$typeArg>('${func.name}', "
         'params: {',
       );
       buffer.writeln();
@@ -156,7 +160,7 @@ class RpcGenerator {
       buffer.writeln('    });');
     } else {
       buffer.writeln(
-        "    final response = await _client.rpc('${func.name}');",
+        "$prefix _client.rpc<$typeArg>('${func.name}');",
       );
     }
 

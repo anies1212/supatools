@@ -35,7 +35,7 @@ void main() {
       expect(output, contains('required String userId'));
       expect(
         output,
-        contains("_client.rpc('get_user_posts'"),
+        contains("_client.rpc<dynamic>('get_user_posts'"),
       );
       expect(output, contains("'user_id': userId"));
       expect(output, contains('/// Get posts by user'));
@@ -57,7 +57,7 @@ void main() {
       expect(output, contains('Future<DateTime>'));
       expect(
         output,
-        contains("_client.rpc('get_server_time')"),
+        contains("_client.rpc<dynamic>('get_server_time')"),
       );
       expect(output, contains('return response as DateTime'));
     });
@@ -76,11 +76,9 @@ void main() {
 
       expect(output, contains('Future<void>'));
       expect(output, contains('cleanupOldData'));
-      // void戻り値はreturn文を含まない
-      expect(
-        output,
-        isNot(contains('return response')),
-      );
+      // void戻り値はresponse変数を含まない
+      expect(output, isNot(contains('final response')));
+      expect(output, contains("await _client.rpc<void>('cleanup_old_data')"));
     });
 
     test('スカラー戻り値のクライアント生成', () {

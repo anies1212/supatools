@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.5] - 2026-02-23
+
+### Fixed
+
+- Restored RPC/EdgeFunction provider generation in `supabase_client_provider.dart` (unified mode)
+  - 1.4.3 accidentally removed RPC/Edge providers from the unified file
+  - Now: without `client_providers_output`, providers are embedded in `supabase_client_provider.dart` (default)
+  - With `client_providers_output`, providers go to a separate file
+
 ## [1.4.4] - 2026-02-23
 
 ### Fixed

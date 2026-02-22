@@ -287,7 +287,7 @@ void main() {
       repoGenerator = RepositoryGenerator();
     });
 
-    test('supabaseClientのみ生成される', () {
+    test('引数なしの場合はsupabaseClientのみ', () {
       final output = repoGenerator.generateSupabaseClientProvider();
 
       expect(
@@ -306,6 +306,37 @@ void main() {
       expect(
         output,
         isNot(contains('supabaseEdgeFunctionClient')),
+      );
+    });
+
+    test('RPC + EdgeFunction 統合モード', () {
+      final output = repoGenerator.generateSupabaseClientProvider(
+        rpcClientImport: 'package:data/rpc_client.dart',
+        edgeFunctionClientImport:
+            'package:data/edge_function_client.dart',
+      );
+
+      expect(
+        output,
+        contains('supabaseClient(Ref ref)'),
+      );
+      expect(
+        output,
+        contains('supabaseRpcClient(Ref ref)'),
+      );
+      expect(
+        output,
+        contains('supabaseEdgeFunctionClient(Ref ref)'),
+      );
+      expect(
+        output,
+        contains("import 'package:data/rpc_client.dart';"),
+      );
+      expect(
+        output,
+        contains(
+          "import 'package:data/edge_function_client.dart';",
+        ),
       );
     });
   });

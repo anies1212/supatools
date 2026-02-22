@@ -254,12 +254,49 @@ Future<int> _generateEdgeFunctionClient(
   return 1;
 }
 
-/// Generates `supabase_client_provider.dart` containing only supabaseClient.
+/// Generates `supabase_client_provider.dart`.
+///
+/// When [clientProvidersOutput] is NOT set, RPC/EdgeFunction providers are
+/// embedded in this file (unified mode).
+/// When [clientProvidersOutput] IS set, only supabaseClient is generated here
+/// and RPC/EdgeFunction providers go to the separate file.
 Future<int> _generateClientProvider(SuparepoConfig config) async {
+  final modelImportPrefix = config.modelImportPrefix;
+  final separateProviders = config.clientProvidersOutput != null;
+
+  String? rpcClientImport;
+  if (config.rpc.enabled && !separateProviders) {
+    final rpcOutput = config.rpc.output;
+    if (rpcOutput != null && modelImportPrefix != null) {
+      rpcClientImport = '$modelImportPrefix${p.basename(rpcOutput)}';
+    } else if (modelImportPrefix != null) {
+      rpcClientImport = '${modelImportPrefix}rpc_client.dart';
+    } else {
+      rpcClientImport = 'rpc_client.dart';
+    }
+  }
+
+  String? edgeFunctionClientImport;
+  if (config.edgeFunctions.enabled && !separateProviders) {
+    final edgeOutput = config.edgeFunctions.output;
+    if (edgeOutput != null && modelImportPrefix != null) {
+      edgeFunctionClientImport =
+          '$modelImportPrefix${p.basename(edgeOutput)}';
+    } else if (modelImportPrefix != null) {
+      edgeFunctionClientImport =
+          '${modelImportPrefix}edge_function_client.dart';
+    } else {
+      edgeFunctionClientImport = 'edge_function_client.dart';
+    }
+  }
+
   final generator = RepositoryGenerator();
   generator.setConfig(config);
 
-  final content = generator.generateSupabaseClientProvider();
+  final content = generator.generateSupabaseClientProvider(
+    rpcClientImport: rpcClientImport,
+    edgeFunctionClientImport: edgeFunctionClientImport,
+  );
 
   final outputFile = File(config.clientProviderOutput!);
   await outputFile.parent.create(recursive: true);

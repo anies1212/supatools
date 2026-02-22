@@ -101,8 +101,7 @@ class RpcParamInfo {
   });
 
   @override
-  String toString() =>
-      'RpcParamInfo($name: $dataType, required: $isRequired)';
+  String toString() => 'RpcParamInfo($name: $dataType, required: $isRequired)';
 }
 
 /// Represents a Supabase RPC (SQL) function
@@ -121,9 +120,20 @@ class RpcFunctionInfo {
     this.description,
   });
 
+  RpcFunctionInfo copyWith({
+    String? returnType,
+    bool? returnsSetOf,
+  }) =>
+      RpcFunctionInfo(
+        name: name,
+        params: params,
+        returnType: returnType ?? this.returnType,
+        returnsSetOf: returnsSetOf ?? this.returnsSetOf,
+        description: description,
+      );
+
   @override
-  String toString() =>
-      'RpcFunctionInfo($name, params: $params, '
+  String toString() => 'RpcFunctionInfo($name, params: $params, '
       'returns: ${returnsSetOf ? 'setof ' : ''}$returnType)';
 }
 
@@ -263,8 +273,7 @@ class SchemaFetcher {
       );
     }
 
-    final openApiUrl =
-        Uri.parse('$supabaseUrl/rest/v1/?apikey=$supabaseKey');
+    final openApiUrl = Uri.parse('$supabaseUrl/rest/v1/?apikey=$supabaseKey');
     final openApiResponse = await http.get(
       openApiUrl,
       headers: {
@@ -291,10 +300,75 @@ class SchemaFetcher {
     return _parseOpenApiSpec(spec);
   }
 
-  /// Fetches RPC function definitions from the OpenAPI spec
+  /// Fetches RPC function definitions from the OpenAPI spec.
+  ///
+  /// When `execute_sql` RPC is available, corrects return types
+  /// by querying `pg_proc` catalog directly.
   Future<List<RpcFunctionInfo>> fetchRpcFunctions() async {
     final spec = await _fetchOpenApiSpec();
-    return parseRpcFunctions(spec);
+    final functions = parseRpcFunctions(spec);
+
+    try {
+      final pgReturnTypes = await _fetchRpcReturnTypes();
+      return mergeReturnTypes(functions, pgReturnTypes);
+    } catch (_) {
+      return functions;
+    }
+  }
+
+  /// Fetches RPC return types from `pg_proc` catalog
+  Future<Map<String, ({String typeName, bool returnsSet})>>
+      _fetchRpcReturnTypes() async {
+    final query = '''
+      SELECT
+        p.proname AS function_name,
+        t.typname AS return_type,
+        p.proretset AS returns_set
+      FROM pg_proc p
+      JOIN pg_namespace n ON p.pronamespace = n.oid
+      JOIN pg_type t ON p.prorettype = t.oid
+      WHERE n.nspname = '$schema'
+    ''';
+
+    final response = await _executeRawQuery(query);
+    final result = <String, ({String typeName, bool returnsSet})>{};
+
+    for (final row in response as List) {
+      final name = row['function_name'] as String;
+      final typeName = row['return_type'] as String;
+      final returnsSet = row['returns_set'] as bool;
+      result[name] = (
+        typeName: typeName,
+        returnsSet: returnsSet,
+      );
+    }
+
+    return result;
+  }
+
+  /// Corrects functions whose return type was resolved as `void` by OpenAPI
+  /// using `pg_proc` results.
+  ///
+  /// - Non-void types from OpenAPI are kept as-is
+  /// - `record` type from pg_proc is treated as void
+  static List<RpcFunctionInfo> mergeReturnTypes(
+    List<RpcFunctionInfo> functions,
+    Map<String, ({String typeName, bool returnsSet})> pgReturnTypes,
+  ) {
+    return functions.map((func) {
+      if (func.returnType != 'void') return func;
+
+      final pgInfo = pgReturnTypes[func.name];
+      if (pgInfo == null) return func;
+
+      // record type is equivalent to void; skip correction
+      if (pgInfo.typeName == 'record') return func;
+
+      return func.copyWith(
+        returnType: pgInfo.typeName,
+        returnsSetOf: pgInfo.returnsSet,
+      );
+    }).toList();
   }
 
   /// Parses RPC functions from OpenAPI spec paths
@@ -312,18 +386,15 @@ class SchemaFetcher {
       if (funcName.isEmpty) continue;
 
       final pathSpec = entry.value as Map<String, dynamic>;
-      final postSpec =
-          pathSpec['post'] as Map<String, dynamic>? ?? {};
+      final postSpec = pathSpec['post'] as Map<String, dynamic>? ?? {};
 
-      final description =
-          postSpec['description'] as String?;
+      final description = postSpec['description'] as String?;
 
       // Parse parameters
       final params = _parseRpcParams(postSpec);
 
       // Parse return type
-      final (returnType, returnsSetOf) =
-          _parseRpcReturnType(postSpec);
+      final (returnType, returnsSetOf) = _parseRpcReturnType(postSpec);
 
       functions.add(RpcFunctionInfo(
         name: funcName,
@@ -342,24 +413,19 @@ class SchemaFetcher {
     Map<String, dynamic> postSpec,
   ) {
     final params = <RpcParamInfo>[];
-    final parameters =
-        postSpec['parameters'] as List<dynamic>? ?? [];
+    final parameters = postSpec['parameters'] as List<dynamic>? ?? [];
 
     for (final param in parameters) {
       final paramMap = param as Map<String, dynamic>;
       final inLocation = paramMap['in'] as String?;
 
       if (inLocation == 'body') {
-        final schema =
-            paramMap['schema'] as Map<String, dynamic>? ?? {};
-        final properties =
-            schema['properties'] as Map<String, dynamic>? ?? {};
-        final required =
-            (schema['required'] as List?)?.cast<String>() ?? [];
+        final schema = paramMap['schema'] as Map<String, dynamic>? ?? {};
+        final properties = schema['properties'] as Map<String, dynamic>? ?? {};
+        final required = (schema['required'] as List?)?.cast<String>() ?? [];
 
         for (final propEntry in properties.entries) {
-          final propSchema =
-              propEntry.value as Map<String, dynamic>;
+          final propSchema = propEntry.value as Map<String, dynamic>;
           final pgType = _openApiTypeToPgType(propSchema);
 
           params.add(RpcParamInfo(
@@ -378,20 +444,16 @@ class SchemaFetcher {
   (String, bool) _parseRpcReturnType(
     Map<String, dynamic> postSpec,
   ) {
-    final responses =
-        postSpec['responses'] as Map<String, dynamic>? ?? {};
-    final okResponse =
-        responses['200'] as Map<String, dynamic>? ?? {};
-    final schema =
-        okResponse['schema'] as Map<String, dynamic>? ?? {};
+    final responses = postSpec['responses'] as Map<String, dynamic>? ?? {};
+    final okResponse = responses['200'] as Map<String, dynamic>? ?? {};
+    final schema = okResponse['schema'] as Map<String, dynamic>? ?? {};
 
     if (schema.isEmpty) return ('void', false);
 
     final type = schema['type'] as String?;
 
     if (type == 'array') {
-      final items =
-          schema['items'] as Map<String, dynamic>? ?? {};
+      final items = schema['items'] as Map<String, dynamic>? ?? {};
       final itemType = _openApiTypeToPgType(items);
       return (itemType, true);
     }

@@ -207,6 +207,29 @@ void main() {
       );
     });
 
+    test('boolean戻り値のクライアント生成', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'is_active_user',
+          params: [
+            RpcParamInfo(
+              name: 'user_id',
+              dataType: 'uuid',
+              isRequired: true,
+            ),
+          ],
+          returnType: 'bool',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(functions);
+
+      expect(output, contains('Future<bool>'));
+      expect(output, contains('isActiveUser'));
+      expect(output, contains('return response as bool'));
+    });
+
     test('複数関数のクライアント生成', () {
       final functions = [
         RpcFunctionInfo(

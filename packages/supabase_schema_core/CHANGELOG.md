@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0] - 2026-02-23
+
+### Added
+
+- `RpcFunctionInfo.copyWith()` method for updating return type fields
+- `SchemaFetcher.mergeReturnTypes()` static method to correct `void` return types using `pg_proc` catalog
+- `SchemaFetcher._fetchRpcReturnTypes()` to query `pg_proc` for accurate return type information
+
+### Changed
+
+- `fetchRpcFunctions()` now queries `pg_proc` catalog to correct scalar return types (e.g. `bool`, `int4`) that PostgREST OpenAPI spec reports as empty schema (void)
+  - Only active when `execute_sql` RPC function is available
+  - Falls back to OpenAPI-only behavior when `execute_sql` is not configured
+
 ## [1.1.0] - 2026-02-11
 
 ### Added

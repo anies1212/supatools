@@ -5,7 +5,7 @@ Generate repository, RPC client, and Edge Function client code from Supabase aut
 ## Features
 
 - **Repository generation** — CRUD operations (getAll, getById, create, update, delete), pagination, count, relation queries
-- **RPC client generation** — Type-safe Dart methods from Supabase SQL functions (auto-detected via OpenAPI spec)
+- **RPC client generation** — Type-safe Dart methods from Supabase SQL functions (auto-detected via OpenAPI spec, with `pg_proc` catalog correction for accurate return types)
 - **Edge Function client generation** — Typed or untyped clients from local `supabase/functions/` directory, with automatic TypeScript type inference
 - Type-safe when used with [supafreeze](https://pub.dev/packages/supafreeze) models
 
@@ -13,7 +13,7 @@ Generate repository, RPC client, and Edge Function client code from Supabase aut
 
 ```yaml
 dependencies:
-  suparepo: ^1.3.0
+  suparepo: ^1.5.0
 ```
 
 ## Quick Start
@@ -73,6 +73,13 @@ dart run suparepo --force      # Force regenerate all
 ## RPC Client Generation
 
 Automatically generates type-safe Dart methods for your Supabase SQL functions (RPC).
+
+### Accurate Return Types via `pg_proc`
+
+PostgREST's OpenAPI spec sometimes returns an empty schema for scalar return types (e.g. `boolean`, `integer`), causing them to be generated as `Future<void>`. When an `execute_sql` RPC function is available in your Supabase project, suparepo queries the `pg_proc` catalog directly to resolve accurate return types.
+
+- **No extra setup needed** — if `execute_sql` exists, correction is automatic
+- **Graceful fallback** — if `execute_sql` is not configured, OpenAPI spec results are used as-is
 
 ### Configuration
 

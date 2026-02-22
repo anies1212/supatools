@@ -312,8 +312,7 @@ void main() {
     test('RPC + EdgeFunction 統合モード', () {
       final output = repoGenerator.generateSupabaseClientProvider(
         rpcClientImport: 'package:data/rpc_client.dart',
-        edgeFunctionClientImport:
-            'package:data/edge_function_client.dart',
+        edgeFunctionClientImport: 'package:data/edge_function_client.dart',
       );
 
       expect(

@@ -134,13 +134,11 @@ void main() {
       expect(queryParam.isRequired, isTrue);
       expect(queryParam.dataType, 'text');
 
-      final limitParam =
-          params.firstWhere((p) => p.name == 'limit_count');
+      final limitParam = params.firstWhere((p) => p.name == 'limit_count');
       expect(limitParam.isRequired, isFalse);
       expect(limitParam.dataType, 'int4');
 
-      final offsetParam =
-          params.firstWhere((p) => p.name == 'offset_count');
+      final offsetParam = params.firstWhere((p) => p.name == 'offset_count');
       expect(offsetParam.isRequired, isFalse);
     });
 
@@ -311,6 +309,163 @@ void main() {
 
       final functions = fetcher.parseRpcFunctions(spec);
       expect(functions, isEmpty);
+    });
+  });
+
+  group('mergeReturnTypes', () {
+    test('voidをboolに補正', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'is_active',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final pgTypes = {
+        'is_active': (typeName: 'bool', returnsSet: false),
+      };
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'bool');
+      expect(result[0].returnsSetOf, isFalse);
+    });
+
+    test('voidをint4に補正', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'count_items',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final pgTypes = {
+        'count_items': (typeName: 'int4', returnsSet: false),
+      };
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'int4');
+      expect(result[0].returnsSetOf, isFalse);
+    });
+
+    test('非voidはそのまま維持', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_count',
+          params: [],
+          returnType: 'int8',
+        ),
+      ];
+      final pgTypes = {
+        'get_count': (typeName: 'int4', returnsSet: false),
+      };
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'int8');
+    });
+
+    test('pg_proc結果が空でも壊れない', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'my_func',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final pgTypes = <String, ({String typeName, bool returnsSet})>{};
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'void');
+    });
+
+    test('record型はvoidのまま維持', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'do_something',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final pgTypes = {
+        'do_something': (typeName: 'record', returnsSet: false),
+      };
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'void');
+    });
+
+    test('returnsSetも補正される', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_names',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final pgTypes = {
+        'get_names': (typeName: 'text', returnsSet: true),
+      };
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'text');
+      expect(result[0].returnsSetOf, isTrue);
+    });
+
+    test('複数関数の混在ケース', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'is_active',
+          params: [],
+          returnType: 'void',
+        ),
+        RpcFunctionInfo(
+          name: 'get_count',
+          params: [],
+          returnType: 'int8',
+        ),
+        RpcFunctionInfo(
+          name: 'cleanup',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final pgTypes = {
+        'is_active': (typeName: 'bool', returnsSet: false),
+        'get_count': (typeName: 'int4', returnsSet: false),
+        'cleanup': (typeName: 'record', returnsSet: false),
+      };
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'bool');
+      expect(result[1].returnType, 'int8');
+      expect(result[2].returnType, 'void');
     });
   });
 }

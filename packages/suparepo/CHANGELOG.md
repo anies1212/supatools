@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0] - 2026-02-23
+
+### Added
+
+- Accurate RPC return type resolution via `pg_proc` catalog
+  - Fixes boolean and other scalar functions being generated as `Future<void>` instead of `Future<bool>`, `Future<int>`, etc.
+  - Requires `execute_sql` RPC function; gracefully falls back to OpenAPI spec when unavailable
+
+### Changed
+
+- Bumped `supabase_schema_core` dependency to `^1.2.0`
+
 ## [1.4.6] - 2026-02-23
 
 ### Fixed

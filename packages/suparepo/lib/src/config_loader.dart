@@ -44,6 +44,7 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       generateProviders: yaml['generate_providers'] == true,
       clientProviderOutput: yaml['client_provider_output']?.toString(),
       clientProviderImport: yaml['client_provider_import']?.toString(),
+      clientProvidersOutput: yaml['client_providers_output']?.toString(),
       rpc: _parseRpcConfig(yaml['rpc']),
       edgeFunctions: _parseEdgeFunctionConfig(
         yaml['edge_functions'],
@@ -221,6 +222,13 @@ class SuparepoConfig extends BaseSupabaseConfig {
   /// Example: `package:gateway/supabase/supabase_client_provider.dart`
   final String? clientProviderImport;
 
+  /// Custom output path for `client_providers.dart`.
+  /// When set, RPC/EdgeFunction providers are generated in a separate file
+  /// at this path (inside the data package), instead of being embedded in
+  /// `supabase_client_provider.dart`.
+  /// Example: `lib/client_providers.dart`
+  final String? clientProvidersOutput;
+
   /// RPC function generation config
   final RpcConfig rpc;
 
@@ -242,6 +250,7 @@ class SuparepoConfig extends BaseSupabaseConfig {
     this.generateProviders = false,
     this.clientProviderOutput,
     this.clientProviderImport,
+    this.clientProvidersOutput,
     this.rpc = const RpcConfig(),
     this.edgeFunctions = const EdgeFunctionConfig(),
   });
@@ -263,6 +272,7 @@ SuparepoConfig:
   generateProviders: $generateProviders
   clientProviderOutput: ${clientProviderOutput ?? 'none'}
   clientProviderImport: ${clientProviderImport ?? 'none'}
+  clientProvidersOutput: ${clientProvidersOutput ?? 'none'}
   rpc.enabled: ${rpc.enabled}
   edgeFunctions.enabled: ${edgeFunctions.enabled}
 ''';

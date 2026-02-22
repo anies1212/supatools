@@ -73,9 +73,14 @@ void main(List<String> args) async {
     totalGenerated += await _generateEdgeFunctionClient(config);
   }
 
-  // --- Unified client provider ---
+  // --- SupabaseClient provider ---
   if (config.generateProviders && config.clientProviderOutput != null) {
     totalGenerated += await _generateClientProvider(config);
+  }
+
+  // --- RPC/EdgeFunction client providers (separate file) ---
+  if (config.generateProviders && config.clientProvidersOutput != null) {
+    totalGenerated += await _generateClientProviders(config);
   }
 
   if (totalGenerated == 0) {
@@ -249,43 +254,12 @@ Future<int> _generateEdgeFunctionClient(
   return 1;
 }
 
-/// Generates a unified client provider file containing
-/// supabaseClient, supabaseRpcClient, and supabaseEdgeFunctionClient.
+/// Generates `supabase_client_provider.dart` containing only supabaseClient.
 Future<int> _generateClientProvider(SuparepoConfig config) async {
-  final modelImportPrefix = config.modelImportPrefix;
-
-  String? rpcClientImport;
-  if (config.rpc.enabled) {
-    final rpcOutput = config.rpc.output;
-    if (rpcOutput != null && modelImportPrefix != null) {
-      rpcClientImport = '$modelImportPrefix${p.basename(rpcOutput)}';
-    } else if (modelImportPrefix != null) {
-      rpcClientImport = '${modelImportPrefix}rpc_client.dart';
-    } else {
-      rpcClientImport = 'rpc_client.dart';
-    }
-  }
-
-  String? edgeFunctionClientImport;
-  if (config.edgeFunctions.enabled) {
-    final edgeOutput = config.edgeFunctions.output;
-    if (edgeOutput != null && modelImportPrefix != null) {
-      edgeFunctionClientImport = '$modelImportPrefix${p.basename(edgeOutput)}';
-    } else if (modelImportPrefix != null) {
-      edgeFunctionClientImport =
-          '${modelImportPrefix}edge_function_client.dart';
-    } else {
-      edgeFunctionClientImport = 'edge_function_client.dart';
-    }
-  }
-
   final generator = RepositoryGenerator();
   generator.setConfig(config);
 
-  final content = generator.generateSupabaseClientProvider(
-    rpcClientImport: rpcClientImport,
-    edgeFunctionClientImport: edgeFunctionClientImport,
-  );
+  final content = generator.generateSupabaseClientProvider();
 
   final outputFile = File(config.clientProviderOutput!);
   await outputFile.parent.create(recursive: true);
@@ -293,4 +267,73 @@ Future<int> _generateClientProvider(SuparepoConfig config) async {
   print('✨ Generated: ${config.clientProviderOutput}');
 
   return 1;
+}
+
+/// Generates `client_providers.dart` containing RPC/EdgeFunction providers.
+/// This file is written to [clientProvidersOutput] (typically in the data
+/// package) and imports supabaseClient from [clientProviderImport].
+Future<int> _generateClientProviders(SuparepoConfig config) async {
+  final clientProviderImport = config.clientProviderImport;
+  if (clientProviderImport == null) {
+    print(
+      '⚠️  client_providers_output requires client_provider_import. Skipping.',
+    );
+    return 0;
+  }
+
+  final outputPath = config.clientProvidersOutput!;
+
+  // Resolve RPC client import relative to output
+  String? rpcClientImport;
+  if (config.rpc.enabled) {
+    final rpcOutput = config.rpc.output;
+    if (rpcOutput != null) {
+      rpcClientImport = _relativeImport(outputPath, rpcOutput);
+    } else {
+      rpcClientImport = _relativeImport(
+        outputPath,
+        p.join(config.output, 'rpc_client.dart'),
+      );
+    }
+  }
+
+  // Resolve EdgeFunction client import relative to output
+  String? edgeFunctionClientImport;
+  if (config.edgeFunctions.enabled) {
+    final edgeOutput = config.edgeFunctions.output;
+    if (edgeOutput != null) {
+      edgeFunctionClientImport = _relativeImport(outputPath, edgeOutput);
+    } else {
+      edgeFunctionClientImport = _relativeImport(
+        outputPath,
+        p.join(config.output, 'edge_function_client.dart'),
+      );
+    }
+  }
+
+  if (rpcClientImport == null && edgeFunctionClientImport == null) {
+    return 0;
+  }
+
+  final generator = RepositoryGenerator();
+  generator.setConfig(config);
+
+  final content = generator.generateClientProviders(
+    clientProviderImport: clientProviderImport,
+    rpcClientImport: rpcClientImport,
+    edgeFunctionClientImport: edgeFunctionClientImport,
+  );
+
+  final outputFile = File(outputPath);
+  await outputFile.parent.create(recursive: true);
+  await outputFile.writeAsString(content);
+  print('✨ Generated: $outputPath');
+
+  return 1;
+}
+
+/// Computes a relative import path from [from] file to [to] file.
+String _relativeImport(String from, String to) {
+  final fromDir = p.dirname(from);
+  return p.relative(to, from: fromDir);
 }

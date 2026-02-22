@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.3] - 2026-02-23
+
+### Changed
+
+- Split RPC/EdgeFunction providers into separate `client_providers.dart` file
+  - `supabase_client_provider.dart` now contains only `supabaseClient` provider
+  - New `client_providers_output` setting generates `client_providers.dart` with `supabaseRpcClient` and `supabaseEdgeFunctionClient` providers
+  - Fixes `InvalidTypeException` when gateway package does not depend on data package
+
 ## [1.4.2] - 2026-02-22
 
 ### Changed

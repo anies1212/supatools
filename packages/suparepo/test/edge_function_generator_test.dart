@@ -278,16 +278,53 @@ void main() {
       repoGenerator = RepositoryGenerator();
     });
 
+    test('supabaseClientのみ生成される', () {
+      final output = repoGenerator.generateSupabaseClientProvider();
+
+      expect(
+        output,
+        contains('supabaseClient(Ref ref)'),
+      );
+      expect(output, contains('@Riverpod(keepAlive: true)'));
+      expect(
+        output,
+        contains("part 'supabase_client_provider.g.dart';"),
+      );
+      expect(
+        output,
+        isNot(contains('supabaseRpcClient')),
+      );
+      expect(
+        output,
+        isNot(contains('supabaseEdgeFunctionClient')),
+      );
+    });
+  });
+
+  group('RepositoryGenerator.generateClientProviders', () {
+    late RepositoryGenerator repoGenerator;
+
+    setUp(() {
+      repoGenerator = RepositoryGenerator();
+    });
+
     test('EdgeFunctionClient プロバイダーが含まれる', () {
-      final output = repoGenerator.generateSupabaseClientProvider(
-        edgeFunctionClientImport: 'package:data/edge_function_client.dart',
+      final output = repoGenerator.generateClientProviders(
+        clientProviderImport:
+            'package:gateway/supabase/supabase_client_provider.dart',
+        edgeFunctionClientImport: 'edge_function_client.dart',
       );
 
       expect(
         output,
         contains(
-          "import 'package:data/edge_function_client.dart';",
+          "import 'package:gateway/supabase/"
+          "supabase_client_provider.dart';",
         ),
+      );
+      expect(
+        output,
+        contains("import 'edge_function_client.dart';"),
       );
       expect(output, contains('@Riverpod(keepAlive: true)'));
       expect(
@@ -308,13 +345,15 @@ void main() {
     });
 
     test('RpcClient プロバイダーが含まれる', () {
-      final output = repoGenerator.generateSupabaseClientProvider(
-        rpcClientImport: 'package:data/rpc_client.dart',
+      final output = repoGenerator.generateClientProviders(
+        clientProviderImport:
+            'package:gateway/supabase/supabase_client_provider.dart',
+        rpcClientImport: 'rpc_client.dart',
       );
 
       expect(
         output,
-        contains("import 'package:data/rpc_client.dart';"),
+        contains("import 'rpc_client.dart';"),
       );
       expect(
         output,
@@ -325,15 +364,13 @@ void main() {
     });
 
     test('RPC + EdgeFunction 両方のプロバイダーが含まれる', () {
-      final output = repoGenerator.generateSupabaseClientProvider(
-        rpcClientImport: 'package:data/rpc_client.dart',
-        edgeFunctionClientImport: 'package:data/edge_function_client.dart',
+      final output = repoGenerator.generateClientProviders(
+        clientProviderImport:
+            'package:gateway/supabase/supabase_client_provider.dart',
+        rpcClientImport: 'rpc_client.dart',
+        edgeFunctionClientImport: 'edge_function_client.dart',
       );
 
-      expect(
-        output,
-        contains('supabaseClient(Ref ref)'),
-      );
       expect(
         output,
         contains('supabaseRpcClient(Ref ref)'),
@@ -342,22 +379,23 @@ void main() {
         output,
         contains('supabaseEdgeFunctionClient(Ref ref)'),
       );
+      // supabaseClientはこのファイルには含まれない
+      expect(
+        output,
+        isNot(contains('supabaseClient(Ref ref)')),
+      );
     });
 
-    test('引数なしの場合はsupabaseClientのみ', () {
-      final output = repoGenerator.generateSupabaseClientProvider();
+    test('part指定がclient_providers.g.dartである', () {
+      final output = repoGenerator.generateClientProviders(
+        clientProviderImport:
+            'package:gateway/supabase/supabase_client_provider.dart',
+        rpcClientImport: 'rpc_client.dart',
+      );
 
       expect(
         output,
-        contains('supabaseClient(Ref ref)'),
-      );
-      expect(
-        output,
-        isNot(contains('supabaseRpcClient')),
-      );
-      expect(
-        output,
-        isNot(contains('supabaseEdgeFunctionClient')),
+        contains("part 'client_providers.g.dart';"),
       );
     });
   });

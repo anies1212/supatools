@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.4] - 2026-02-23
+
+### Fixed
+
+- Added `ignore_for_file` directives to `edge_function_client.dart` generated code
+  - Suppresses `public_member_api_docs`, `sort_constructors_first`, `lines_longer_than_80_chars` lint warnings
+
 ## [1.4.3] - 2026-02-23
 
 ### Changed

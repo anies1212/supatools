@@ -151,10 +151,11 @@ void main() {
       expect(output, contains('required String userId'));
       expect(
         output,
-        contains("_client.rpc<dynamic>('get_user_posts'"),
+        contains("_client.rpc<List<dynamic>>('get_user_posts'"),
       );
       expect(output, contains("'user_id': userId"));
       expect(output, contains('/// Get posts by user'));
+      expect(output, contains('response.cast<Map<String, dynamic>>()'));
     });
 
     test('パラメータなし関数のクライアント生成', () {
@@ -173,9 +174,10 @@ void main() {
       expect(output, contains('Future<DateTime>'));
       expect(
         output,
-        contains("_client.rpc<dynamic>('get_server_time')"),
+        contains("return await _client.rpc<DateTime>('get_server_time')"),
       );
-      expect(output, contains('return response as DateTime'));
+      // スカラー型はキャスト不要
+      expect(output, isNot(contains('response as')));
     });
 
     test('void戻り値のクライアント生成', () {
@@ -210,7 +212,10 @@ void main() {
       final output = generator.generateRpcClient(functions);
 
       expect(output, contains('Future<int>'));
-      expect(output, contains('return response as int'));
+      expect(
+        output,
+        contains("return await _client.rpc<int>('count_active_users')"),
+      );
     });
 
     test('setof戻り値（スカラー型）のクライアント生成', () {
@@ -226,10 +231,7 @@ void main() {
       final output = generator.generateRpcClient(functions);
 
       expect(output, contains('Future<List<String>>'));
-      expect(
-        output,
-        contains('(response as List).cast<String>()'),
-      );
+      expect(output, contains('response.cast<String>()'));
     });
 
     test('snake_case→camelCase変換', () {
@@ -343,7 +345,10 @@ void main() {
 
       expect(output, contains('Future<bool>'));
       expect(output, contains('isActiveUser'));
-      expect(output, contains('return response as bool'));
+      expect(
+        output,
+        contains("return await _client.rpc<bool>('is_active_user'"),
+      );
     });
 
     test('複数関数のクライアント生成', () {

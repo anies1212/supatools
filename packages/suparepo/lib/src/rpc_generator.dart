@@ -175,8 +175,20 @@ class RpcGenerator {
 
     // Method body
     final isVoid = dartReturnType == 'void';
-    final prefix = isVoid ? '    await' : '    final response = await';
-    final typeArg = isVoid ? 'void' : 'dynamic';
+    final isScalar = !isVoid && !func.returnsSetOf;
+    final String prefix;
+    final String typeArg;
+
+    if (isVoid) {
+      prefix = '    await';
+      typeArg = 'void';
+    } else if (isScalar) {
+      prefix = '    return await';
+      typeArg = dartReturnType;
+    } else {
+      prefix = '    final response = await';
+      typeArg = 'List<dynamic>';
+    }
 
     if (func.params.isNotEmpty) {
       buffer.write(
@@ -206,7 +218,7 @@ class RpcGenerator {
       );
     }
 
-    // Return statement
+    // Return statement (only needed for setof)
     _generateReturn(buffer, func, dartReturnType);
 
     buffer.writeln('  }');
@@ -217,26 +229,13 @@ class RpcGenerator {
     RpcFunctionInfo func,
     String dartReturnType,
   ) {
-    if (dartReturnType == 'void') {
-      return;
-    }
+    // void and scalar are handled inline (await / return await)
+    if (!func.returnsSetOf) return;
 
-    if (func.returnsSetOf) {
-      final itemType = TypeMapper.mapType(func.returnType);
-      if (itemType == 'Map<String, dynamic>') {
-        buffer.writeln(
-          '    return (response as List)'
-          '.cast<Map<String, dynamic>>();',
-        );
-      } else {
-        buffer.writeln(
-          '    return (response as List).cast<$itemType>();',
-        );
-      }
-    } else {
-      final scalarType = TypeMapper.mapType(func.returnType);
-      buffer.writeln('    return response as $scalarType;');
-    }
+    final itemType = TypeMapper.mapType(func.returnType);
+    buffer.writeln(
+      '    return response.cast<$itemType>();',
+    );
   }
 
   String _buildReturnType(RpcFunctionInfo func) {

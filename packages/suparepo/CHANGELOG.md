@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.6.2] - 2026-02-23
+
+### Changed
+
+- RPC client now uses typed generics on `rpc<T>()` calls instead of `rpc<dynamic>()` with manual casts
+  - Scalar: `return await _client.rpc<bool>(...)` (was `_client.rpc<dynamic>(...)` + `response as bool`)
+  - setof: `_client.rpc<List<dynamic>>(...)` + `response.cast<T>()`
+  - void: unchanged (`_client.rpc<void>(...)`)
+
 ## [1.6.1] - 2026-02-23
 
 ### Fixed

@@ -316,24 +316,32 @@ class SchemaFetcher {
     }
   }
 
-  /// Fetches RPC return types from `pg_proc` catalog
+  /// Fetches RPC return types from `pg_proc` catalog.
+  ///
+  /// The query is wrapped with `json_agg` so that `execute_sql`
+  /// (which uses `EXECUTE ... INTO`) returns all rows as a single
+  /// JSON array instead of only the first row.
   Future<Map<String, ({String typeName, bool returnsSet})>>
       _fetchRpcReturnTypes() async {
     final query = '''
-      SELECT
-        p.proname AS function_name,
-        t.typname AS return_type,
-        p.proretset AS returns_set
-      FROM pg_proc p
-      JOIN pg_namespace n ON p.pronamespace = n.oid
-      JOIN pg_type t ON p.prorettype = t.oid
-      WHERE n.nspname = '$schema'
+      SELECT json_agg(sub) FROM (
+        SELECT
+          p.proname AS function_name,
+          t.typname AS return_type,
+          p.proretset AS returns_set
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        JOIN pg_type t ON p.prorettype = t.oid
+        WHERE n.nspname = '$schema'
+      ) sub
     ''';
 
     final response = await _executeRawQuery(query);
     final result = <String, ({String typeName, bool returnsSet})>{};
 
-    for (final row in response as List) {
+    // response is the json_agg result (a List), or null if no rows
+    final rows = response is List ? response : <dynamic>[];
+    for (final row in rows) {
       final name = row['function_name'] as String;
       final typeName = row['return_type'] as String;
       final returnsSet = row['returns_set'] as bool;

@@ -161,9 +161,11 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     print('📝 Applied return_types overrides: ${returnTypes.keys.join(', ')}');
   }
 
-  // Apply filters
-  final filtered =
-      functions.where((f) => config.rpc.shouldIncludeFunction(f.name)).toList();
+  // Apply filters (execute_sql is internal infrastructure, always exclude)
+  final filtered = functions
+      .where((f) =>
+          f.name != 'execute_sql' && config.rpc.shouldIncludeFunction(f.name))
+      .toList();
 
   if (filtered.isEmpty) {
     print('ℹ️  No RPC functions found.');

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2026-02-23
+
+### Fixed
+
+- `_fetchRpcReturnTypes()` now wraps the `pg_proc` query with `json_agg` so that `execute_sql` (which uses `EXECUTE ... INTO`) returns all rows as a single JSON array instead of only the first row
+
 ## [1.2.0] - 2026-02-23
 
 ### Added

@@ -2,7 +2,7 @@ name: supabase_schema_core
 description: >-
   Internal package for Supabase schema fetching and type mapping.
   Used by supafreeze and suparepo. Not intended for direct use.
-version: 1.2.0
+version: 1.2.1
 homepage: https://github.com/anies1212/supatools
 repository: https://github.com/anies1212/supatools/tree/main/packages/supabase_schema_core
 

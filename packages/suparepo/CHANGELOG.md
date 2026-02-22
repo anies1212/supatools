@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.6.1] - 2026-02-23
+
+### Fixed
+
+- `execute_sql` via `pg_proc` now returns all function rows (was only returning the first row due to `EXECUTE ... INTO` limitation; fixed by wrapping query with `json_agg`)
+- `execute_sql` is now automatically excluded from generated RPC client (internal infrastructure, not a user-facing function)
+
+### Changed
+
+- Bumped `supabase_schema_core` dependency to `^1.2.1`
+
 ## [1.6.0] - 2026-02-23
 
 ### Added

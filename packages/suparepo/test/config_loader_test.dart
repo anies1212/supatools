@@ -168,6 +168,48 @@ client_provider_import: package:gateway/supabase/supabase_client_provider.dart
       );
     });
 
+    test('RPC return_typesのパース', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+  return_types:
+    get_my_invite_code: text
+    execute_exchange_atomic: void
+    get_favorite_products: setof jsonb
+    is_active_user: bool
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      expect(config!.rpc.returnTypes, isNotNull);
+      final rt = config.rpc.returnTypes!;
+      expect(rt['get_my_invite_code'], 'text');
+      expect(rt['execute_exchange_atomic'], 'void');
+      expect(rt['get_favorite_products'], 'setof jsonb');
+      expect(rt['is_active_user'], 'bool');
+    });
+
+    test('RPC return_types未指定はnull', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      expect(config!.rpc.returnTypes, isNull);
+    });
+
     test('デフォルト値の適用', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co

@@ -13,7 +13,7 @@ Generate repository, RPC client, and Edge Function client code from Supabase aut
 
 ```yaml
 dependencies:
-  suparepo: ^1.5.0
+  suparepo: ^1.6.0
 ```
 
 ## Quick Start
@@ -74,13 +74,6 @@ dart run suparepo --force      # Force regenerate all
 
 Automatically generates type-safe Dart methods for your Supabase SQL functions (RPC).
 
-### Accurate Return Types via `pg_proc`
-
-PostgREST's OpenAPI spec sometimes returns an empty schema for scalar return types (e.g. `boolean`, `integer`), causing them to be generated as `Future<void>`. When an `execute_sql` RPC function is available in your Supabase project, suparepo queries the `pg_proc` catalog directly to resolve accurate return types.
-
-- **No extra setup needed** — if `execute_sql` exists, correction is automatic
-- **Graceful fallback** — if `execute_sql` is not configured, OpenAPI spec results are used as-is
-
 ### Configuration
 
 ```yaml
@@ -114,6 +107,82 @@ class SupabaseRpcClient {
   }
 }
 ```
+
+### Return Type Correction
+
+PostgREST's OpenAPI spec does not always return accurate type information for RPC functions with scalar return values (`boolean`, `integer`, `text`, etc.). As a result, methods that should be `Future<bool>` or `Future<String>` may be generated as `Future<void>`.
+
+suparepo resolves return types in the following priority order:
+
+```
+1. YAML return_types (highest priority, manual)
+   ↓ not defined
+2. pg_proc auto-correction (when execute_sql exists)
+   ↓ execute_sql not available
+3. OpenAPI spec (fallback, may produce void)
+```
+
+#### Option 1: Manual override with `return_types` (recommended)
+
+The simplest approach. Specify return types directly in `suparepo.yaml`:
+
+```yaml
+rpc:
+  enabled: true
+  return_types:
+    get_my_invite_code: text
+    is_active_user: bool
+    count_items: int4
+    execute_exchange_atomic: void
+    get_favorite_products: setof jsonb
+```
+
+- Values are PostgreSQL type names (`text`, `bool`, `int4`, `int8`, `jsonb`, `uuid`, etc.)
+- Add `setof` prefix to generate a method returning `List<T>`
+- These overrides take the highest priority over all other detection methods
+- No need to create an `execute_sql` function — this is the easiest option
+
+**Type mapping reference:**
+
+| PostgreSQL type | Dart type |
+|---|---|
+| `text`, `varchar` | `String` |
+| `bool` | `bool` |
+| `int4`, `int8` | `int` |
+| `float4`, `float8` | `double` |
+| `jsonb`, `json` | `Map<String, dynamic>` |
+| `uuid` | `String` |
+| `timestamptz` | `DateTime` |
+| `void` | `void` |
+
+#### Option 2: Automatic correction via `execute_sql`
+
+By creating an `execute_sql` RPC function in your Supabase project, suparepo can query the PostgreSQL `pg_proc` catalog directly to auto-detect accurate return types for all RPC functions.
+
+**Why is this needed?** PostgREST's OpenAPI spec does not always report RPC return types accurately. The `execute_sql` function allows suparepo to run a SQL query against `pg_proc` (PostgreSQL's internal function definition table) to retrieve the correct type information.
+
+**Run the following in Supabase SQL Editor:**
+
+```sql
+CREATE OR REPLACE FUNCTION execute_sql(query text)
+RETURNS json
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  result json;
+BEGIN
+  EXECUTE query INTO result;
+  RETURN result;
+END;
+$$;
+```
+
+> **Warning:** This function runs with `SECURITY DEFINER` privileges. Ensure it is only callable with the service_role key (which suparepo uses via `secret_key`). Review your RLS policies and API exposure settings to prevent unauthorized access.
+
+Once created, no additional configuration is needed — suparepo automatically detects `execute_sql` and applies corrections. If `execute_sql` does not exist, no error is raised and the OpenAPI spec results are used as-is.
+
+**Using both `return_types` and `execute_sql`:** When both are configured, functions listed in `return_types` use the YAML values, while all other functions are corrected via `execute_sql`.
 
 ## Edge Function Client Generation
 
@@ -365,6 +434,10 @@ rpc:
   output: lib/repositories/rpc_client.dart
   include: [get_user_posts]
   exclude: [internal_cleanup]
+  return_types:                 # Manual return type overrides (see "Return Type Correction")
+    get_invite_code: text
+    is_active: bool
+    get_items: setof jsonb
 
 # Edge Function client
 edge_functions:

@@ -154,6 +154,13 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     return 0;
   }
 
+  // YAML return_types で上書き（YAML最優先）
+  final returnTypes = config.rpc.returnTypes;
+  if (returnTypes != null) {
+    functions = applyReturnTypeOverrides(functions, returnTypes);
+    print('📝 Applied return_types overrides: ${returnTypes.keys.join(', ')}');
+  }
+
   // Apply filters
   final filtered =
       functions.where((f) => config.rpc.shouldIncludeFunction(f.name)).toList();
@@ -280,8 +287,7 @@ Future<int> _generateClientProvider(SuparepoConfig config) async {
   if (config.edgeFunctions.enabled && !separateProviders) {
     final edgeOutput = config.edgeFunctions.output;
     if (edgeOutput != null && modelImportPrefix != null) {
-      edgeFunctionClientImport =
-          '$modelImportPrefix${p.basename(edgeOutput)}';
+      edgeFunctionClientImport = '$modelImportPrefix${p.basename(edgeOutput)}';
     } else if (modelImportPrefix != null) {
       edgeFunctionClientImport =
           '${modelImportPrefix}edge_function_client.dart';

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0] - 2026-02-23
+
+### Added
+
+- YAML `return_types` for manual RPC return type overrides
+  - Specify PostgreSQL type names per function (e.g. `text`, `bool`, `setof jsonb`)
+  - Takes highest priority over `pg_proc` auto-correction and OpenAPI spec
+  - No `execute_sql` function needed — ideal for projects without it
+- Comprehensive README documentation for return type correction
+  - `execute_sql` setup guide with SQL snippet and security notes
+  - Type mapping reference table
+  - Priority order explanation
+
 ## [1.5.0] - 2026-02-23
 
 ### Added

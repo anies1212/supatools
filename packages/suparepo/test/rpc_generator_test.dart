@@ -9,6 +9,122 @@ void main() {
     generator = RpcGenerator();
   });
 
+  group('applyReturnTypeOverrides', () {
+    test('スカラー型の上書き', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_invite_code',
+          params: [],
+          returnType: 'void',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final result = applyReturnTypeOverrides(
+        functions,
+        {'get_invite_code': 'text'},
+      );
+
+      expect(result[0].returnType, 'text');
+      expect(result[0].returnsSetOf, isFalse);
+    });
+
+    test('setofプレフィックスでreturnsSetOfをtrue', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_items',
+          params: [],
+          returnType: 'void',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final result = applyReturnTypeOverrides(
+        functions,
+        {'get_items': 'setof jsonb'},
+      );
+
+      expect(result[0].returnType, 'jsonb');
+      expect(result[0].returnsSetOf, isTrue);
+    });
+
+    test('該当しない関数は変更なし', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'unrelated_func',
+          params: [],
+          returnType: 'int4',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final result = applyReturnTypeOverrides(
+        functions,
+        {'other_func': 'text'},
+      );
+
+      expect(result[0].returnType, 'int4');
+      expect(result[0].returnsSetOf, isFalse);
+    });
+
+    test('複数関数の上書き', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'func_a',
+          params: [],
+          returnType: 'void',
+          returnsSetOf: false,
+        ),
+        RpcFunctionInfo(
+          name: 'func_b',
+          params: [],
+          returnType: 'void',
+          returnsSetOf: false,
+        ),
+        RpcFunctionInfo(
+          name: 'func_c',
+          params: [],
+          returnType: 'int4',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final result = applyReturnTypeOverrides(
+        functions,
+        {
+          'func_a': 'bool',
+          'func_b': 'setof text',
+        },
+      );
+
+      expect(result[0].returnType, 'bool');
+      expect(result[0].returnsSetOf, isFalse);
+      expect(result[1].returnType, 'text');
+      expect(result[1].returnsSetOf, isTrue);
+      expect(result[2].returnType, 'int4');
+      expect(result[2].returnsSetOf, isFalse);
+    });
+
+    test('voidへの明示的な上書き', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'fire_and_forget',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+      ];
+
+      final result = applyReturnTypeOverrides(
+        functions,
+        {'fire_and_forget': 'void'},
+      );
+
+      expect(result[0].returnType, 'void');
+      expect(result[0].returnsSetOf, isFalse);
+    });
+  });
+
   group('RpcGenerator', () {
     test('パラメータあり関数のクライアント生成', () {
       final functions = [

@@ -65,6 +65,27 @@ const Set<String> _dartReservedWords = {
   'yield',
 };
 
+/// Applies YAML `return_types` overrides to RPC functions.
+///
+/// Values can be a PG type name (e.g. `text`, `bool`, `jsonb`)
+/// or `setof <type>` to indicate `returnsSetOf: true`.
+List<RpcFunctionInfo> applyReturnTypeOverrides(
+  List<RpcFunctionInfo> functions,
+  Map<String, String> returnTypes,
+) {
+  return functions.map((func) {
+    final override = returnTypes[func.name];
+    if (override == null) return func;
+
+    final trimmed = override.trim().toLowerCase();
+    if (trimmed.startsWith('setof ')) {
+      final type = trimmed.substring(6).trim();
+      return func.copyWith(returnType: type, returnsSetOf: true);
+    }
+    return func.copyWith(returnType: trimmed, returnsSetOf: false);
+  }).toList();
+}
+
 /// Generates a Supabase RPC client class from RPC function info
 class RpcGenerator {
   /// Generates the full RPC client file content

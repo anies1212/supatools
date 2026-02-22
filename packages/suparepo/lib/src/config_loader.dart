@@ -60,7 +60,18 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       output: value['output']?.toString(),
       include: parseStringList(value['include']),
       exclude: parseStringList(value['exclude']),
+      returnTypes: _parseReturnTypes(value['return_types']),
     );
+  }
+
+  Map<String, String>? _parseReturnTypes(dynamic value) {
+    if (value == null || value is! YamlMap) return null;
+
+    final result = <String, String>{};
+    for (final entry in value.entries) {
+      result[entry.key.toString()] = entry.value.toString();
+    }
+    return result.isEmpty ? null : result;
   }
 
   EdgeFunctionConfig _parseEdgeFunctionConfig(dynamic value) {
@@ -128,11 +139,17 @@ class RpcConfig {
   final List<String>? include;
   final List<String>? exclude;
 
+  /// Manual return type overrides: function name → PG type name.
+  /// e.g. `{'get_my_invite_code': 'text', 'get_items': 'setof jsonb'}`
+  /// `setof` prefix sets `returnsSetOf: true`.
+  final Map<String, String>? returnTypes;
+
   const RpcConfig({
     this.enabled = false,
     this.output,
     this.include,
     this.exclude,
+    this.returnTypes,
   });
 
   /// Checks if a function should be included

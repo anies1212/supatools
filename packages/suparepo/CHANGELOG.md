@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.4.1] - 2026-02-22
+
+### Fixed
+
+- Added CHANGELOG.md entry for 1.4.0 (fixes pub.dev scoring)
+
+## [1.4.0] - 2026-02-22
+
+### Added
+
+- **Automatic TypeScript type inference** for Edge Functions
+  - Extracts request types from `body as { ... }` patterns
+  - Extracts response types from `JSON.stringify({ ... })` in success responses
+  - Detects required/optional fields from validation if-statements (`!field`, `typeof` checks)
+  - Supports `handler.ts` delegation pattern
+  - Type mapping: `string` → `String`, `number` → `int`, `boolean` → `bool`
+  - Enabled by default (`auto_detect_types: true`), YAML model definitions take precedence
+- **Riverpod provider generation for Edge Function client**
+  - Generates `@Riverpod(keepAlive: true)` provider for `SupabaseEdgeFunctionClient`
+  - Consistent with existing RPC client provider pattern
+
 ## [1.3.3] - 2026-02-18
 
 ### Added

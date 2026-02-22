@@ -251,5 +251,81 @@ void main() {
         ),
       );
     });
+
+    test('Riverpod provider generation', () {
+      final functions = [
+        EdgeFunctionInfo(name: 'send-email'),
+      ];
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+        generateProviders: true,
+      );
+
+      expect(
+        output,
+        contains(
+          "import 'package:riverpod_annotation/"
+          "riverpod_annotation.dart';",
+        ),
+      );
+      expect(
+        output,
+        contains("import 'supabase_client_provider.dart';"),
+      );
+      expect(
+        output,
+        contains("part 'edge_function_client.g.dart';"),
+      );
+      expect(output, contains('@Riverpod(keepAlive: true)'));
+      expect(
+        output,
+        contains(
+          'SupabaseEdgeFunctionClient '
+          'supabaseEdgeFunctionClient(Ref ref)',
+        ),
+      );
+      expect(
+        output,
+        contains('ref.watch(supabaseClientProvider)'),
+      );
+    });
+
+    test('Riverpod provider with custom import', () {
+      final functions = [
+        EdgeFunctionInfo(name: 'send-email'),
+      ];
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+        generateProviders: true,
+        clientProviderImport:
+            'package:gateway/supabase/supabase_client_provider.dart',
+      );
+
+      expect(
+        output,
+        contains(
+          "import 'package:gateway/supabase/"
+          "supabase_client_provider.dart';",
+        ),
+      );
+    });
+
+    test('no provider when generateProviders is false', () {
+      final functions = [
+        EdgeFunctionInfo(name: 'send-email'),
+      ];
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+      );
+
+      expect(output, isNot(contains('@Riverpod')));
+      expect(
+        output,
+        isNot(contains('riverpod_annotation')),
+      );
+    });
   });
 }

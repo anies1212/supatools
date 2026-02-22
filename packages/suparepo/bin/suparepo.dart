@@ -7,6 +7,8 @@ import 'package:suparepo/src/repository_generator.dart';
 import 'package:suparepo/src/rpc_generator.dart';
 import 'package:suparepo/src/edge_function_detector.dart';
 import 'package:suparepo/src/edge_function_generator.dart';
+import 'package:suparepo/src/ts_type_extractor.dart';
+import 'package:suparepo/src/edge_function_info.dart';
 import 'package:path/path.dart' as p;
 
 /// CLI tool for suparepo code generation
@@ -39,8 +41,7 @@ void main(List<String> args) async {
   final runEdge = !hasFilter || edgeOnly;
 
   // Validate config for repo/rpc (need Supabase connection)
-  if ((runRepo || (runRpc && config.rpc.enabled)) &&
-      !config.isValid) {
+  if ((runRepo || (runRpc && config.rpc.enabled)) && !config.isValid) {
     final issues = config.validate();
     print('❌ Error: Configuration incomplete:');
     for (final issue in issues) {
@@ -99,9 +100,8 @@ Future<int> _generateRepositories(
     return 0;
   }
 
-  final filtered = tables
-      .where((t) => config.shouldIncludeTable(t.name))
-      .toList();
+  final filtered =
+      tables.where((t) => config.shouldIncludeTable(t.name)).toList();
 
   if (filtered.isEmpty) {
     print('ℹ️  No tables found matching filter criteria.');
@@ -128,8 +128,7 @@ Future<int> _generateRepositories(
   var count = files.length;
 
   // Generate supabase_client_provider.dart at custom path if specified
-  if (config.generateProviders &&
-      config.clientProviderOutput != null) {
+  if (config.generateProviders && config.clientProviderOutput != null) {
     final content = generator.generateSupabaseClientProvider();
     final outputFile = File(config.clientProviderOutput!);
     await outputFile.parent.create(recursive: true);
@@ -158,9 +157,8 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
   }
 
   // Apply filters
-  final filtered = functions
-      .where((f) => config.rpc.shouldIncludeFunction(f.name))
-      .toList();
+  final filtered =
+      functions.where((f) => config.rpc.shouldIncludeFunction(f.name)).toList();
 
   if (filtered.isEmpty) {
     print('ℹ️  No RPC functions found.');
@@ -216,11 +214,39 @@ Future<int> _generateEdgeFunctionClient(
     '${filtered.map((f) => f.name).join(', ')}',
   );
 
+  // Build modelDefs: YAML definitions + TS auto-detection
+  var modelDefs =
+      config.edgeFunctions.models ?? <String, EdgeFunctionModelDef>{};
+
+  if (config.edgeFunctions.autoDetectTypes) {
+    final loader = TsTypeExtractorLoader();
+    final autoDetected = <String, EdgeFunctionModelDef>{};
+
+    for (final func in filtered) {
+      // Skip functions already defined in YAML
+      if (modelDefs.containsKey(func.name)) continue;
+
+      final funcDir = p.join(
+        config.edgeFunctions.functionsPath,
+        func.name,
+      );
+      final modelDef = await loader.extractFromDirectory(funcDir);
+      if (modelDef != null) {
+        autoDetected[func.name] = modelDef;
+        print('🔍 Auto-detected types: ${func.name}');
+      }
+    }
+
+    modelDefs = {...modelDefs, ...autoDetected};
+  }
+
   final generator = EdgeFunctionGenerator();
   final content = generator.generateEdgeFunctionClient(
     filtered,
-    modelDefs: config.edgeFunctions.models,
+    modelDefs: modelDefs.isEmpty ? null : modelDefs,
     supabaseImport: config.supabaseImport,
+    generateProviders: config.generateProviders,
+    clientProviderImport: config.clientProviderImport,
   );
 
   final outputPath = config.edgeFunctions.output ??

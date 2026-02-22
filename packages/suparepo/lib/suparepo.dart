@@ -49,15 +49,11 @@ export 'package:supabase_schema_core/supabase_schema_core.dart'
 
 // Suparepo-specific exports
 export 'src/config_loader.dart'
-    show
-        SuparepoConfigLoader,
-        SuparepoConfig,
-        RpcConfig,
-        EdgeFunctionConfig;
+    show SuparepoConfigLoader, SuparepoConfig, RpcConfig, EdgeFunctionConfig;
 export 'src/repository_generator.dart' show RepositoryGenerator;
 export 'src/rpc_generator.dart' show RpcGenerator;
 export 'src/edge_function_detector.dart' show EdgeFunctionDetector;
-export 'src/edge_function_generator.dart'
-    show EdgeFunctionGenerator;
+export 'src/edge_function_generator.dart' show EdgeFunctionGenerator;
 export 'src/edge_function_info.dart'
     show EdgeFunctionInfo, EdgeFunctionFieldDef, EdgeFunctionModelDef;
+export 'src/ts_type_extractor.dart' show TsTypeExtractor, TsTypeExtractorLoader;

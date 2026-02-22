@@ -23,8 +23,7 @@ void main() {
       await func1Dir.create();
       await File(p.join(func1Dir.path, 'index.ts')).create();
 
-      final func2Dir =
-          Directory(p.join(basePath, 'process-payment'));
+      final func2Dir = Directory(p.join(basePath, 'process-payment'));
       await func2Dir.create();
       await File(p.join(func2Dir.path, 'index.ts')).create();
 

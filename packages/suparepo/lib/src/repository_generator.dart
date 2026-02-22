@@ -18,8 +18,7 @@ class RepositoryGenerator {
 
   /// Whether typed model classes are available
   bool get _hasModelImport =>
-      _config?.modelImportPrefix != null ||
-      _config?.modelImportPath != null;
+      _config?.modelImportPrefix != null || _config?.modelImportPath != null;
 
   /// Gets the class name for a table's model
   String getModelClassName(String tableName) {
@@ -79,8 +78,7 @@ class RepositoryGenerator {
 
     // Model import: prefix-based (individual files) or barrel
     if (_config?.modelImportPrefix != null) {
-      final modelFile =
-          '${ReCase(table.name).snakeCase}.supafreeze.dart';
+      final modelFile = '${ReCase(table.name).snakeCase}.supafreeze.dart';
       buffer.writeln(
         "import '${_config!.modelImportPrefix}$modelFile';",
       );
@@ -91,8 +89,8 @@ class RepositoryGenerator {
     if (_config?.generateProviders == true) {
       buffer.writeln();
       final fileName = ReCase(table.name).snakeCase;
-      final providerImport = _config?.clientProviderImport ??
-          'supabase_client_provider.dart';
+      final providerImport =
+          _config?.clientProviderImport ?? 'supabase_client_provider.dart';
       buffer.writeln("import '$providerImport';");
       buffer.writeln();
       buffer.writeln("part '${fileName}_repository.g.dart';");

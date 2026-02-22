@@ -39,13 +39,11 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       generateBarrel: yaml['generate_barrel'] == true,
       modelImportPath: yaml['model_import_path']?.toString(),
       modelImportPrefix: yaml['model_import_prefix']?.toString(),
-      supabaseImport: yaml['supabase_import']?.toString() ??
-          defaultSupabaseImport,
+      supabaseImport:
+          yaml['supabase_import']?.toString() ?? defaultSupabaseImport,
       generateProviders: yaml['generate_providers'] == true,
-      clientProviderOutput:
-          yaml['client_provider_output']?.toString(),
-      clientProviderImport:
-          yaml['client_provider_import']?.toString(),
+      clientProviderOutput: yaml['client_provider_output']?.toString(),
+      clientProviderImport: yaml['client_provider_import']?.toString(),
       rpc: _parseRpcConfig(yaml['rpc']),
       edgeFunctions: _parseEdgeFunctionConfig(
         yaml['edge_functions'],
@@ -72,11 +70,12 @@ class SuparepoConfigLoader extends BaseConfigLoader {
     return EdgeFunctionConfig(
       enabled: value['enabled'] == true,
       output: value['output']?.toString(),
-      functionsPath: value['functions_path']?.toString() ??
-          'supabase/functions',
+      functionsPath:
+          value['functions_path']?.toString() ?? 'supabase/functions',
       include: parseStringList(value['include']),
       exclude: parseStringList(value['exclude']),
       models: _parseEdgeFunctionModels(value['models']),
+      autoDetectTypes: value['auto_detect_types'] != false,
     );
   }
 
@@ -156,6 +155,10 @@ class EdgeFunctionConfig {
   final List<String>? exclude;
   final Map<String, EdgeFunctionModelDef>? models;
 
+  /// Whether to auto-detect request/response types from TypeScript source.
+  /// Enabled by default. Functions with YAML model definitions take precedence.
+  final bool autoDetectTypes;
+
   const EdgeFunctionConfig({
     this.enabled = false,
     this.output,
@@ -163,6 +166,7 @@ class EdgeFunctionConfig {
     this.include,
     this.exclude,
     this.models,
+    this.autoDetectTypes = true,
   });
 
   /// Checks if a function should be included
@@ -178,8 +182,7 @@ class EdgeFunctionConfig {
 }
 
 /// Default Supabase import for Flutter projects
-const defaultSupabaseImport =
-    'package:supabase_flutter/supabase_flutter.dart';
+const defaultSupabaseImport = 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Supabase import for pure Dart projects
 const pureDartSupabaseImport = 'package:supabase/supabase.dart';

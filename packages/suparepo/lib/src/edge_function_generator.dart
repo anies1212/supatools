@@ -12,6 +12,8 @@ class EdgeFunctionGenerator {
     List<EdgeFunctionInfo> functions, {
     Map<String, EdgeFunctionModelDef>? modelDefs,
     String supabaseImport = defaultSupabaseImport,
+    bool generateProviders = false,
+    String? clientProviderImport,
   }) {
     final buffer = StringBuffer();
 
@@ -21,6 +23,11 @@ class EdgeFunctionGenerator {
     buffer.writeln();
 
     // Imports
+    if (generateProviders) {
+      buffer.writeln(
+        "import 'package:riverpod_annotation/riverpod_annotation.dart';",
+      );
+    }
     buffer.writeln("import '$supabaseImport';");
 
     // Check if any function has model definitions
@@ -30,6 +37,15 @@ class EdgeFunctionGenerator {
       buffer.writeln(
         "import 'dart:convert';",
       );
+    }
+
+    if (generateProviders) {
+      buffer.writeln();
+      final providerImport =
+          clientProviderImport ?? 'supabase_client_provider.dart';
+      buffer.writeln("import '$providerImport';");
+      buffer.writeln();
+      buffer.writeln("part 'edge_function_client.g.dart';");
     }
 
     buffer.writeln();
@@ -85,6 +101,27 @@ class EdgeFunctionGenerator {
 
     buffer.writeln('}');
 
+    // Generate Riverpod provider if enabled
+    if (generateProviders) {
+      buffer.writeln();
+      buffer.writeln(
+        '/// Provider for [SupabaseEdgeFunctionClient]',
+      );
+      buffer.writeln('@Riverpod(keepAlive: true)');
+      buffer.writeln(
+        'SupabaseEdgeFunctionClient '
+        'supabaseEdgeFunctionClient(Ref ref) {',
+      );
+      buffer.writeln(
+        '  final client = '
+        'ref.watch(supabaseClientProvider);',
+      );
+      buffer.writeln(
+        '  return SupabaseEdgeFunctionClient(client);',
+      );
+      buffer.writeln('}');
+    }
+
     return buffer.toString();
   }
 
@@ -121,9 +158,7 @@ class EdgeFunctionGenerator {
 
     final hasRequest = modelDef.request != null;
     final hasResponse = modelDef.response != null;
-    final returnType = hasResponse
-        ? '${baseName}Response'
-        : 'FunctionResponse';
+    final returnType = hasResponse ? '${baseName}Response' : 'FunctionResponse';
 
     if (func.description != null) {
       buffer.writeln('  /// ${func.description}');
@@ -245,8 +280,7 @@ class EdgeFunctionGenerator {
       (String pgType) => switch (pgType) {
             'text' || 'varchar' || 'uuid' => 'String',
             'int4' || 'int8' || 'integer' || 'bigint' => 'int',
-            'float4' || 'float8' || 'numeric' || 'double' =>
-              'double',
+            'float4' || 'float8' || 'numeric' || 'double' => 'double',
             'bool' || 'boolean' => 'bool',
             'json' || 'jsonb' => 'Map<String, dynamic>',
             'timestamp' || 'timestamptz' || 'date' => 'String',

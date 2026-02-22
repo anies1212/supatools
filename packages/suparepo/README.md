@@ -6,7 +6,7 @@ Generate repository, RPC client, and Edge Function client code from Supabase aut
 
 - **Repository generation** — CRUD operations (getAll, getById, create, update, delete), pagination, count, relation queries
 - **RPC client generation** — Type-safe Dart methods from Supabase SQL functions (auto-detected via OpenAPI spec)
-- **Edge Function client generation** — Typed or untyped clients from local `supabase/functions/` directory
+- **Edge Function client generation** — Typed or untyped clients from local `supabase/functions/` directory, with automatic TypeScript type inference
 - Type-safe when used with [supafreeze](https://pub.dev/packages/supafreeze) models
 
 ## Installation
@@ -112,15 +112,68 @@ class SupabaseRpcClient {
 
 Generates client code for your Supabase Edge Functions by scanning the local `supabase/functions/` directory.
 
+### Automatic TypeScript Type Inference
+
+suparepo analyzes your Edge Function TypeScript source code and automatically infers request/response types. This eliminates the need to manually define `models` in YAML.
+
+**Supported TypeScript patterns:**
+
+```typescript
+// Request: extracted from `body as { ... }` pattern
+const { amount, provider } = body as {
+  amount?: number;
+  provider?: string;
+};
+
+// Required detection: inferred from validation if-statements
+if (!amount || !provider) {
+  return new Response(JSON.stringify({ error: "Missing" }), { status: 400 });
+}
+
+// Response: extracted from success response (status 2xx) JSON.stringify()
+return new Response(
+  JSON.stringify({ exchange_id: data.id, message: "OK" }),
+  { status: 200, headers },
+);
+```
+
+**Type mapping:**
+
+| TypeScript | Dart |
+|-----------|------|
+| `string` | `String` |
+| `number` | `int` |
+| `boolean` | `bool` |
+
+**Required/optional detection:**
+
+- `!field` check present → **required**
+- `typeof field !== "type"` check present → **required**
+- `?` suffix with no validation → **optional**
+
 ### Configuration
+
+Minimal configuration (types are auto-detected from TypeScript):
+
+```yaml
+edge_functions:
+  enabled: true
+  functions_path: supabase/functions
+```
+
+Full configuration:
 
 ```yaml
 edge_functions:
   enabled: true
   functions_path: supabase/functions  # default
   output: lib/repositories/edge_function_client.dart  # optional
+  auto_detect_types: true  # Auto-detect types from TypeScript (default: true)
   include:
     - send-email
+  exclude:
+    - hello
+  # Functions with YAML model definitions take precedence over auto-detection
   models:
     send-email:
       request:
@@ -132,7 +185,11 @@ edge_functions:
         message_id: { type: text }
 ```
 
+> **Note:** `auto_detect_types` is enabled by default. Functions with YAML `models` definitions take precedence; only undefined functions are inferred from TypeScript. Set `auto_detect_types: false` to disable.
+
 ### Generated Code — Without Type Definitions
+
+When `auto_detect_types: false` and no `models` defined:
 
 ```dart
 class SupabaseEdgeFunctionClient {
@@ -153,7 +210,7 @@ class SupabaseEdgeFunctionClient {
 
 ### Generated Code — With Type Definitions
 
-When `models` are defined in the config, typed request/response classes are generated:
+When types are auto-detected or defined via YAML, typed request/response classes are generated:
 
 ```dart
 class SendEmailRequest {
@@ -307,7 +364,10 @@ edge_functions:
   enabled: true
   output: lib/repositories/edge_function_client.dart
   functions_path: supabase/functions
+  auto_detect_types: true    # Auto-detect types from TypeScript (default: true)
   include: [send-email]
+  # exclude: [hello]
+  # Functions with YAML models take precedence; others are auto-detected from TS
   models:
     send-email:
       request:

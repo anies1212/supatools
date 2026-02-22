@@ -25,8 +25,7 @@ class EdgeFunctionFieldDef {
   });
 
   @override
-  String toString() =>
-      'EdgeFunctionFieldDef($name: $dataType, '
+  String toString() => 'EdgeFunctionFieldDef($name: $dataType, '
       'required: $isRequired)';
 }
 

@@ -155,7 +155,7 @@ class EdgeFunctionGenerator {
     if (hasResponse) {
       buffer.writeln(
         '    return ${baseName}Response.fromJson('
-        'jsonDecode(utf8.decode(response.data)) '
+        'jsonDecode(utf8.decode(response.data as List<int>)) '
         'as Map<String, dynamic>);',
       );
     } else {

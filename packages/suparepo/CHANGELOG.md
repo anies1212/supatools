@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.6] - 2026-02-23
+
+### Fixed
+
+- Fixed `argument_type_not_assignable` error in generated Edge Function client
+  - `response.data` is `dynamic`, added explicit `as List<int>` cast for `utf8.decode()`
+
 ## [1.4.5] - 2026-02-23
 
 ### Fixed

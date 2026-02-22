@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2] - 2026-02-22
+
+### Changed
+
+- Moved RPC and Edge Function client providers to unified `client_provider_output` file
+  - `supabase_client_provider.dart` now contains `supabaseClient`, `supabaseRpcClient`, and `supabaseEdgeFunctionClient` providers
+  - Removed inline provider generation from `rpc_client.dart` and `edge_function_client.dart`
+
 ## [1.4.1] - 2026-02-22
 
 ### Fixed

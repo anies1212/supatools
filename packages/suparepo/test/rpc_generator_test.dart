@@ -243,7 +243,7 @@ void main() {
       );
     });
 
-    test('clientProviderImport指定時にカスタムimportを使用', () {
+    test('プロバイダーはインライン生成しない', () {
       final functions = [
         RpcFunctionInfo(
           name: 'test_func',
@@ -253,24 +253,11 @@ void main() {
         ),
       ];
 
-      final output = generator.generateRpcClient(
-        functions,
-        generateProviders: true,
-        clientProviderImport:
-            'package:gateway/supabase/supabase_client_provider.dart',
-      );
+      final output = generator.generateRpcClient(functions);
 
-      expect(
-        output,
-        contains(
-          "import 'package:gateway/supabase/"
-          "supabase_client_provider.dart'",
-        ),
-      );
-      expect(
-        output,
-        isNot(contains("import 'supabase_client_provider.dart'")),
-      );
+      expect(output, isNot(contains('@Riverpod')));
+      expect(output, isNot(contains('riverpod_annotation')));
+      expect(output, isNot(contains('part ')));
     });
   });
 }

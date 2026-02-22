@@ -71,8 +71,6 @@ class RpcGenerator {
   String generateRpcClient(
     List<RpcFunctionInfo> functions, {
     String supabaseImport = defaultSupabaseImport,
-    bool generateProviders = false,
-    String? clientProviderImport,
   }) {
     final buffer = StringBuffer();
 
@@ -94,20 +92,7 @@ class RpcGenerator {
     buffer.writeln();
 
     // Imports
-    if (generateProviders) {
-      buffer.writeln(
-        "import 'package:riverpod_annotation/riverpod_annotation.dart';",
-      );
-    }
     buffer.writeln("import '$supabaseImport';");
-    if (generateProviders) {
-      buffer.writeln();
-      final providerImport =
-          clientProviderImport ?? 'supabase_client_provider.dart';
-      buffer.writeln("import '$providerImport';");
-      buffer.writeln();
-      buffer.writeln("part 'rpc_client.g.dart';");
-    }
     buffer.writeln();
 
     // Class definition
@@ -123,21 +108,6 @@ class RpcGenerator {
     }
 
     buffer.writeln('}');
-
-    // Generate Riverpod provider if enabled
-    if (generateProviders) {
-      buffer.writeln();
-      buffer.writeln('/// Provider for [SupabaseRpcClient]');
-      buffer.writeln('@Riverpod(keepAlive: true)');
-      buffer.writeln(
-        'SupabaseRpcClient supabaseRpcClient(Ref ref) {',
-      );
-      buffer.writeln(
-        '  final client = ref.watch(supabaseClientProvider);',
-      );
-      buffer.writeln('  return SupabaseRpcClient(client);');
-      buffer.writeln('}');
-    }
 
     return buffer.toString();
   }

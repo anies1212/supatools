@@ -1,5 +1,6 @@
 import 'package:suparepo/src/edge_function_generator.dart';
 import 'package:suparepo/src/edge_function_info.dart';
+import 'package:suparepo/src/repository_generator.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -252,30 +253,41 @@ void main() {
       );
     });
 
-    test('Riverpod provider generation', () {
+    test('プロバイダーはインライン生成しない', () {
       final functions = [
         EdgeFunctionInfo(name: 'send-email'),
       ];
 
       final output = generator.generateEdgeFunctionClient(
         functions,
-        generateProviders: true,
+      );
+
+      expect(output, isNot(contains('@Riverpod')));
+      expect(
+        output,
+        isNot(contains('riverpod_annotation')),
+      );
+      expect(output, isNot(contains('part ')));
+    });
+  });
+
+  group('RepositoryGenerator.generateSupabaseClientProvider', () {
+    late RepositoryGenerator repoGenerator;
+
+    setUp(() {
+      repoGenerator = RepositoryGenerator();
+    });
+
+    test('EdgeFunctionClient プロバイダーが含まれる', () {
+      final output = repoGenerator.generateSupabaseClientProvider(
+        edgeFunctionClientImport: 'package:data/edge_function_client.dart',
       );
 
       expect(
         output,
         contains(
-          "import 'package:riverpod_annotation/"
-          "riverpod_annotation.dart';",
+          "import 'package:data/edge_function_client.dart';",
         ),
-      );
-      expect(
-        output,
-        contains("import 'supabase_client_provider.dart';"),
-      );
-      expect(
-        output,
-        contains("part 'edge_function_client.g.dart';"),
       );
       expect(output, contains('@Riverpod(keepAlive: true)'));
       expect(
@@ -289,42 +301,63 @@ void main() {
         output,
         contains('ref.watch(supabaseClientProvider)'),
       );
+      expect(
+        output,
+        contains('SupabaseEdgeFunctionClient(client)'),
+      );
     });
 
-    test('Riverpod provider with custom import', () {
-      final functions = [
-        EdgeFunctionInfo(name: 'send-email'),
-      ];
-
-      final output = generator.generateEdgeFunctionClient(
-        functions,
-        generateProviders: true,
-        clientProviderImport:
-            'package:gateway/supabase/supabase_client_provider.dart',
+    test('RpcClient プロバイダーが含まれる', () {
+      final output = repoGenerator.generateSupabaseClientProvider(
+        rpcClientImport: 'package:data/rpc_client.dart',
       );
 
       expect(
         output,
+        contains("import 'package:data/rpc_client.dart';"),
+      );
+      expect(
+        output,
         contains(
-          "import 'package:gateway/supabase/"
-          "supabase_client_provider.dart';",
+          'SupabaseRpcClient supabaseRpcClient(Ref ref)',
         ),
       );
     });
 
-    test('no provider when generateProviders is false', () {
-      final functions = [
-        EdgeFunctionInfo(name: 'send-email'),
-      ];
-
-      final output = generator.generateEdgeFunctionClient(
-        functions,
+    test('RPC + EdgeFunction 両方のプロバイダーが含まれる', () {
+      final output = repoGenerator.generateSupabaseClientProvider(
+        rpcClientImport: 'package:data/rpc_client.dart',
+        edgeFunctionClientImport: 'package:data/edge_function_client.dart',
       );
 
-      expect(output, isNot(contains('@Riverpod')));
       expect(
         output,
-        isNot(contains('riverpod_annotation')),
+        contains('supabaseClient(Ref ref)'),
+      );
+      expect(
+        output,
+        contains('supabaseRpcClient(Ref ref)'),
+      );
+      expect(
+        output,
+        contains('supabaseEdgeFunctionClient(Ref ref)'),
+      );
+    });
+
+    test('引数なしの場合はsupabaseClientのみ', () {
+      final output = repoGenerator.generateSupabaseClientProvider();
+
+      expect(
+        output,
+        contains('supabaseClient(Ref ref)'),
+      );
+      expect(
+        output,
+        isNot(contains('supabaseRpcClient')),
+      );
+      expect(
+        output,
+        isNot(contains('supabaseEdgeFunctionClient')),
       );
     });
   });

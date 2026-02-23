@@ -13,7 +13,7 @@ Generate repository, RPC client, and Edge Function client code from Supabase aut
 
 ```yaml
 dependencies:
-  suparepo: ^1.7.0
+  suparepo: ^1.7.1
 ```
 
 ## Quick Start

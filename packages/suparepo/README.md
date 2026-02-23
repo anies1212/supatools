@@ -13,7 +13,7 @@ Generate repository, RPC client, and Edge Function client code from Supabase aut
 
 ```yaml
 dependencies:
-  suparepo: ^1.6.2
+  suparepo: ^1.7.0
 ```
 
 ## Quick Start
@@ -321,6 +321,94 @@ class SendEmailResponse {
   }
 }
 ```
+
+### Error Type Generation (Freezed sealed class)
+
+suparepo automatically detects error responses from your Edge Function TypeScript source and generates Freezed sealed classes for type-safe error handling.
+
+**Detected TypeScript pattern:**
+
+```typescript
+// Edge Function: create-order
+if (!hasStock) {
+  return new Response(
+    JSON.stringify({ error: "out_of_stock", message: "Item is out of stock" }),
+    { status: 400, headers },
+  );
+}
+if (duplicateOrder) {
+  return new Response(
+    JSON.stringify({ error: "duplicate_order", message: "Already ordered" }),
+    { status: 409, headers },
+  );
+}
+```
+
+- Scans `new Response(...)` blocks with status 4xx/5xx
+- Extracts `error` field string literals in `snake_case` format
+- Skips generic messages (e.g., `"Missing"`, `"Bad request"`)
+
+**Generated code** (`create_order_error.dart`):
+
+```dart
+@freezed
+sealed class CreateOrderError with _$CreateOrderError {
+  const CreateOrderError._();
+
+  const factory CreateOrderError.outOfStock({
+    required int status,
+    required String message,
+  }) = CreateOrderErrorOutOfStock;
+
+  const factory CreateOrderError.duplicateOrder({
+    required int status,
+    required String message,
+  }) = CreateOrderErrorDuplicateOrder;
+
+  const factory CreateOrderError.unknown({
+    required int status,
+    required String errorCode,
+    required String message,
+  }) = CreateOrderErrorUnknown;
+
+  factory CreateOrderError.fromFunctionException(
+    FunctionException e,
+  ) {
+    final body = jsonDecode(e.details as String)
+        as Map<String, dynamic>;
+    final code = body['error'] as String? ?? '';
+    final msg = body['message'] as String? ?? code;
+    return switch (code) {
+      'out_of_stock' => CreateOrderError.outOfStock(
+          status: e.status, message: msg),
+      'duplicate_order' => CreateOrderError.duplicateOrder(
+          status: e.status, message: msg),
+      _ => CreateOrderError.unknown(
+          status: e.status, errorCode: code, message: msg),
+    };
+  }
+}
+```
+
+**Usage in your app:**
+
+```dart
+try {
+  await edgeFunctionClient.createOrder(request: req);
+} on FunctionException catch (e) {
+  final error = CreateOrderError.fromFunctionException(e);
+  switch (error) {
+    case CreateOrderErrorOutOfStock(:final message):
+      showSnackBar(message);
+    case CreateOrderErrorDuplicateOrder():
+      showSnackBar('Already ordered');
+    case CreateOrderErrorUnknown(:final errorCode):
+      showSnackBar('Error: $errorCode');
+  }
+}
+```
+
+Error class files are generated alongside the Edge Function client in the same directory. Run `build_runner` to generate the `.freezed.dart` part files.
 
 ## Repository Generation
 

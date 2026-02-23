@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0] - 2026-02-23
+
+### Added
+
+- **Edge Function error type generation** (Freezed sealed class)
+  - Automatically detects error responses (status 4xx/5xx) from TypeScript source
+  - Extracts `snake_case` error codes from `JSON.stringify({ error: "..." })` patterns
+  - Generates Freezed sealed class per Edge Function with named constructors for each error code
+  - Includes `unknown` variant for unrecognized error codes
+  - Includes `fromFunctionException` factory for easy `FunctionException` parsing
+  - Error class files are output alongside the Edge Function client (e.g., `submit_campaign_receipt_error.dart`)
+
 ## [1.6.2] - 2026-02-23
 
 ### Changed

@@ -17,12 +17,16 @@ class TsTypeExtractor {
 
     final request = _extractRequestFields(source);
     final response = _extractResponseFields(source);
+    final errors = _extractErrorCodes(source);
 
-    if (request == null && response == null) return null;
+    if (request == null && response == null && errors == null) {
+      return null;
+    }
 
     return EdgeFunctionModelDef(
       request: request,
       response: response,
+      errors: errors,
     );
   }
 
@@ -149,6 +153,47 @@ class TsTypeExtractor {
     return 'text';
   }
 
+  /// Extracts error codes from error responses (4xx/5xx)
+  List<EdgeFunctionErrorDef>? _extractErrorCodes(String source) {
+    final errors = <EdgeFunctionErrorDef>[];
+    final seen = <String>{};
+
+    for (final match in _newResponsePattern.allMatches(source)) {
+      final block = match.group(0)!;
+
+      // Only error responses
+      final statusMatch = _errorStatusPattern.firstMatch(block);
+      if (statusMatch == null) continue;
+
+      final statusCode = int.tryParse(
+        RegExp(r'status:\s*(\d+)').firstMatch(block)!.group(1)!,
+      );
+
+      final stringifyMatch = _jsonStringifyFieldsPattern.firstMatch(block);
+      if (stringifyMatch == null) continue;
+
+      final jsonBody = stringifyMatch.group(1)!;
+
+      // Extract error field value
+      final errorFieldMatch = _errorFieldPattern.firstMatch(jsonBody);
+      if (errorFieldMatch == null) continue;
+
+      final code = errorFieldMatch.group(1)!;
+
+      // Only snake_case error codes
+      if (!_snakeCasePattern.hasMatch(code)) continue;
+      if (seen.contains(code)) continue;
+
+      seen.add(code);
+      errors.add(EdgeFunctionErrorDef(
+        code: code,
+        statusCode: statusCode,
+      ));
+    }
+
+    return errors.isEmpty ? null : errors;
+  }
+
   /// Removes comments as a preprocessing step
   String _removeComments(String source) {
     // Single-line comments
@@ -203,6 +248,16 @@ class TsTypeExtractor {
 
   /// Identifier pattern (for variable name check)
   static final _identifierPattern = RegExp(r'^\w+$');
+
+  /// Extracts `error: "..."` field value from JSON.stringify body
+  static final _errorFieldPattern = RegExp(
+    r'''error:\s*["']([^"']+)["']''',
+  );
+
+  /// snake_case pattern (at least one underscore, lowercase + digits)
+  static final _snakeCasePattern = RegExp(
+    r'^[a-z][a-z0-9]*(_[a-z0-9]+)+$',
+  );
 }
 
 /// Loads TypeScript source from filesystem and extracts types

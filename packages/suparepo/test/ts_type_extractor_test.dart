@@ -271,6 +271,163 @@ const { x } = body as { x: boolean };
       });
     });
 
+    group('エラーコード抽出', () {
+      test('snake_caseのエラーコードを検出', () {
+        const source = '''
+return new Response(
+  JSON.stringify({ error: "outside_time_window", message: "Not in time" }),
+  { status: 400, headers },
+);
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result, isNotNull);
+        expect(result!.errors, isNotNull);
+        expect(result.errors, hasLength(1));
+        expect(result.errors!.first.code, 'outside_time_window');
+        expect(result.errors!.first.statusCode, 400);
+      });
+
+      test('汎用メッセージ（非snake_case）はスキップ', () {
+        const source = '''
+return new Response(
+  JSON.stringify({ error: "Missing" }),
+  { status: 400, headers },
+);
+return new Response(
+  JSON.stringify({ error: "Bad request" }),
+  { status: 400, headers },
+);
+return new Response(
+  JSON.stringify({ error: "required" }),
+  { status: 400, headers },
+);
+return new Response(
+  JSON.stringify({ error: "bad" }),
+  { status: 400, headers },
+);
+''';
+        final result = extractor.extract(indexSource: source);
+        // errorsがnullであること（snake_caseでないため）
+        expect(result, isNull);
+      });
+
+      test('複数エラーコードの検出', () {
+        const source = '''
+if (outsideWindow) {
+  return new Response(
+    JSON.stringify({ error: "outside_time_window", message: "too late" }),
+    { status: 400, headers },
+  );
+}
+if (alreadyDone) {
+  return new Response(
+    JSON.stringify({ error: "already_participated", message: "done" }),
+    { status: 409, headers },
+  );
+}
+return new Response(
+  JSON.stringify({ result: "ok" }),
+  { status: 200, headers },
+);
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result, isNotNull);
+        expect(result!.errors, hasLength(2));
+
+        final codes = result.errors!.map((e) => e.code).toList();
+        expect(codes, contains('outside_time_window'));
+        expect(codes, contains('already_participated'));
+      });
+
+      test('ステータスコードの紐付け', () {
+        const source = '''
+return new Response(
+  JSON.stringify({ error: "insufficient_balance" }),
+  { status: 402, headers },
+);
+return new Response(
+  JSON.stringify({ error: "not_found_item" }),
+  { status: 404, headers },
+);
+return new Response(
+  JSON.stringify({ error: "server_internal_error" }),
+  { status: 500, headers },
+);
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result!.errors, hasLength(3));
+
+        final balance = result.errors!.firstWhere(
+          (e) => e.code == 'insufficient_balance',
+        );
+        expect(balance.statusCode, 402);
+
+        final notFound = result.errors!.firstWhere(
+          (e) => e.code == 'not_found_item',
+        );
+        expect(notFound.statusCode, 404);
+
+        final internal = result.errors!.firstWhere(
+          (e) => e.code == 'server_internal_error',
+        );
+        expect(internal.statusCode, 500);
+      });
+
+      test('重複エラーコードは1つにまとめる', () {
+        const source = '''
+if (cond1) {
+  return new Response(
+    JSON.stringify({ error: "duplicate_entry" }),
+    { status: 400, headers },
+  );
+}
+if (cond2) {
+  return new Response(
+    JSON.stringify({ error: "duplicate_entry" }),
+    { status: 409, headers },
+  );
+}
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result!.errors, hasLength(1));
+        expect(result.errors!.first.code, 'duplicate_entry');
+      });
+
+      test('成功レスポンス(2xx)のerrorフィールドは無視', () {
+        const source = '''
+return new Response(
+  JSON.stringify({ error: "some_error_code" }),
+  { status: 200, headers },
+);
+''';
+        final result = extractor.extract(indexSource: source);
+        // 2xxなのでエラーとして検出されない
+        expect(result?.errors, isNull);
+      });
+
+      test('リクエスト・レスポンス・エラーすべて抽出', () {
+        const source = '''
+const { name } = body as { name?: string };
+if (!name) {
+  return new Response(
+    JSON.stringify({ error: "missing_name", message: "Name is required" }),
+    { status: 400, headers },
+  );
+}
+return new Response(
+  JSON.stringify({ greeting: "Hello" }),
+  { status: 200, headers },
+);
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result, isNotNull);
+        expect(result!.request, isNotNull);
+        expect(result.response, isNotNull);
+        expect(result.errors, isNotNull);
+        expect(result.errors!.first.code, 'missing_name');
+      });
+    });
+
     group('エッジケース', () {
       test('body asパターンがない場合はnull', () {
         const source = 'console.log("hello");';

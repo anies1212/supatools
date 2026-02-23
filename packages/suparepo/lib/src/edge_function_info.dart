@@ -29,10 +29,26 @@ class EdgeFunctionFieldDef {
       'required: $isRequired)';
 }
 
-/// Model definition for an Edge Function (request + response)
+/// Edge Functionのエラーコード定義
+class EdgeFunctionErrorDef {
+  final String code;
+  final int? statusCode;
+
+  const EdgeFunctionErrorDef({required this.code, this.statusCode});
+
+  @override
+  String toString() => 'EdgeFunctionErrorDef($code, status: $statusCode)';
+}
+
+/// Model definition for an Edge Function (request + response + errors)
 class EdgeFunctionModelDef {
   final List<EdgeFunctionFieldDef>? request;
   final List<EdgeFunctionFieldDef>? response;
+  final List<EdgeFunctionErrorDef>? errors;
 
-  const EdgeFunctionModelDef({this.request, this.response});
+  const EdgeFunctionModelDef({
+    this.request,
+    this.response,
+    this.errors,
+  });
 }

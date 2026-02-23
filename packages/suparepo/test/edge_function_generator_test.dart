@@ -280,6 +280,175 @@ void main() {
     });
   });
 
+  group('EdgeFunctionGenerator.generateErrorClass', () {
+    test('Freezed sealed classが生成される', () {
+      final errors = [
+        EdgeFunctionErrorDef(
+          code: 'outside_time_window',
+          statusCode: 400,
+        ),
+        EdgeFunctionErrorDef(
+          code: 'already_participated',
+          statusCode: 409,
+        ),
+      ];
+
+      final output = generator.generateErrorClass(
+        'submit-campaign-receipt',
+        errors,
+      );
+
+      expect(output, isNotNull);
+      expect(output, contains('GENERATED CODE - DO NOT MODIFY BY HAND'));
+      expect(
+        output,
+        contains(
+          "import 'package:freezed_annotation/"
+          "freezed_annotation.dart';",
+        ),
+      );
+      expect(
+        output,
+        contains("import 'dart:convert';"),
+      );
+      expect(
+        output,
+        contains(
+          "part 'submit_campaign_receipt_error.freezed.dart';",
+        ),
+      );
+      expect(output, contains('@freezed'));
+      expect(
+        output,
+        contains(
+          'sealed class SubmitCampaignReceiptError',
+        ),
+      );
+      expect(
+        output,
+        contains('const SubmitCampaignReceiptError._()'),
+      );
+
+      // Named constructors
+      expect(
+        output,
+        contains(
+          'SubmitCampaignReceiptError.outsideTimeWindow',
+        ),
+      );
+      expect(
+        output,
+        contains(
+          'SubmitCampaignReceiptErrorOutsideTimeWindow',
+        ),
+      );
+      expect(
+        output,
+        contains(
+          'SubmitCampaignReceiptError.alreadyParticipated',
+        ),
+      );
+      expect(
+        output,
+        contains(
+          'SubmitCampaignReceiptErrorAlreadyParticipated',
+        ),
+      );
+
+      // Unknown variant
+      expect(
+        output,
+        contains('SubmitCampaignReceiptError.unknown'),
+      );
+      expect(
+        output,
+        contains('SubmitCampaignReceiptErrorUnknown'),
+      );
+      expect(output, contains('required String errorCode'));
+
+      // fromFunctionException
+      expect(
+        output,
+        contains(
+          'SubmitCampaignReceiptError.fromFunctionException',
+        ),
+      );
+      expect(output, contains('FunctionException e'));
+      expect(output, contains('jsonDecode(e.details as String)'));
+      expect(
+        output,
+        contains("'outside_time_window' =>"),
+      );
+      expect(
+        output,
+        contains("'already_participated' =>"),
+      );
+    });
+
+    test('空のエラーリストでnullを返す', () {
+      final output = generator.generateErrorClass(
+        'test-func',
+        [],
+      );
+      expect(output, isNull);
+    });
+
+    test('単一エラーコードの場合', () {
+      final errors = [
+        EdgeFunctionErrorDef(
+          code: 'invalid_token',
+          statusCode: 401,
+        ),
+      ];
+
+      final output = generator.generateErrorClass(
+        'verify-token',
+        errors,
+      );
+
+      expect(output, isNotNull);
+      expect(output, contains('sealed class VerifyTokenError'));
+      expect(
+        output,
+        contains('VerifyTokenError.invalidToken'),
+      );
+      expect(output, contains('VerifyTokenError.unknown'));
+      expect(output, contains("'invalid_token' =>"));
+    });
+  });
+
+  group('EdgeFunctionGenerator.generateErrorClasses', () {
+    test('エラー定義のある関数のみファイル生成', () {
+      final modelDefs = {
+        'submit-receipt': EdgeFunctionModelDef(
+          errors: [
+            EdgeFunctionErrorDef(
+              code: 'duplicate_receipt',
+              statusCode: 409,
+            ),
+          ],
+        ),
+        'no-error-func': const EdgeFunctionModelDef(
+          response: [
+            EdgeFunctionFieldDef(
+              name: 'ok',
+              dataType: 'bool',
+            ),
+          ],
+        ),
+      };
+
+      final result = generator.generateErrorClasses(modelDefs);
+
+      expect(result, hasLength(1));
+      expect(result.containsKey('submit_receipt_error.dart'), isTrue);
+      expect(
+        result['submit_receipt_error.dart'],
+        contains('sealed class SubmitReceiptError'),
+      );
+    });
+  });
+
   group('RepositoryGenerator.generateSupabaseClientProvider', () {
     late RepositoryGenerator repoGenerator;
 

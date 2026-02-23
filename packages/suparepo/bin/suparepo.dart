@@ -260,7 +260,27 @@ Future<int> _generateEdgeFunctionClient(
   await outputFile.writeAsString(content);
   print('✨ Generated: $outputPath');
 
-  return 1;
+  var generated = 1;
+
+  // Generate error class files
+  if (modelDefs.isNotEmpty) {
+    final errorFiles = generator.generateErrorClasses(
+      modelDefs,
+      supabaseImport: config.supabaseImport,
+    );
+
+    final outputDir = p.dirname(outputPath);
+    for (final entry in errorFiles.entries) {
+      final errorPath = p.join(outputDir, entry.key);
+      final errorFile = File(errorPath);
+      await errorFile.parent.create(recursive: true);
+      await errorFile.writeAsString(entry.value);
+      print('✨ Generated: $errorPath');
+      generated++;
+    }
+  }
+
+  return generated;
 }
 
 /// Generates `supabase_client_provider.dart`.

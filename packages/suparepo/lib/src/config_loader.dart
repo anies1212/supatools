@@ -61,6 +61,10 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       include: parseStringList(value['include']),
       exclude: parseStringList(value['exclude']),
       returnTypes: _parseReturnTypes(value['return_types']),
+      generateResultModels:
+          value['generate_result_models'] == true,
+      resultModelsOutput:
+          value['result_models_output']?.toString(),
     );
   }
 
@@ -144,12 +148,22 @@ class RpcConfig {
   /// `setof` prefix sets `returnsSetOf: true`.
   final Map<String, String>? returnTypes;
 
+  /// When true, generates Freezed result model classes for
+  /// RETURNS TABLE functions.
+  final bool generateResultModels;
+
+  /// Output directory for result model files.
+  /// If null, models are written next to the RPC client file.
+  final String? resultModelsOutput;
+
   const RpcConfig({
     this.enabled = false,
     this.output,
     this.include,
     this.exclude,
     this.returnTypes,
+    this.generateResultModels = false,
+    this.resultModelsOutput,
   });
 
   /// Checks if a function should be included

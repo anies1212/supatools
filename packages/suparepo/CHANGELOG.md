@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.8.0] - 2026-03-03
+
+### Added
+
+- **Freezed result model generation for RETURNS TABLE functions** (`generate_result_models`)
+  - Automatically generates `@freezed` result model classes with `fromRow()` factory for RPC functions using `RETURNS TABLE(col1 type1, ...)`
+  - Column names and types are fetched from `pg_proc` catalog (`proargmodes`, `proargnames`, `proallargtypes`)
+  - RPC client methods return typed `List<GetMyInviteCodeResult>` instead of `List<Map<String, dynamic>>`
+  - Model file per function: e.g. `get_my_invite_code_result.dart`
+  - Configurable output directory via `result_models_output`
+  - Requires `execute_sql` RPC function and `build_runner` for Freezed code generation
+
+### Changed
+
+- Bumped `supabase_schema_core` dependency to `^1.3.0`
+- `RpcGenerator.generateRpcClient()` accepts `generateResultModels` and `resultModelsImportPrefix` parameters
+
 ## [1.7.2] - 2026-03-03
 
 ### Fixed

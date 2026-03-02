@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0] - 2026-03-03
+
+### Added
+
+- `RpcTableColumn` class for representing columns in `RETURNS TABLE(...)` definitions
+- `RpcFunctionInfo.tableColumns` field — non-null when the function uses `RETURNS TABLE(col1 type1, ...)`
+- `SchemaFetcher._fetchRpcTableColumns()` — queries `pg_proc` catalog (`proargmodes`, `proargnames`, `proallargtypes`) to extract TABLE column names and types
+- `SchemaFetcher.mergeTableColumns()` static method to merge TABLE column info into `RpcFunctionInfo` list
+- `fetchRpcFunctions()` now calls `mergeTableColumns` after `mergeReturnTypes` to populate `tableColumns` for RETURNS TABLE functions
+
 ## [1.2.2] - 2026-03-03
 
 ### Fixed

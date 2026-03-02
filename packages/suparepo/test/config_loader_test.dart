@@ -210,6 +210,45 @@ rpc:
       expect(config!.rpc.returnTypes, isNull);
     });
 
+    test('RPC generate_result_modelsのパース', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+  generate_result_models: true
+  result_models_output: lib/models/rpc
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      expect(config!.rpc.generateResultModels, isTrue);
+      expect(
+        config.rpc.resultModelsOutput,
+        'lib/models/rpc',
+      );
+    });
+
+    test('generate_result_modelsデフォルトはfalse', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      expect(config!.rpc.generateResultModels, isFalse);
+      expect(config.rpc.resultModelsOutput, isNull);
+    });
+
     test('デフォルト値の適用', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co

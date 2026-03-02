@@ -404,4 +404,226 @@ void main() {
       expect(output, isNot(contains('part ')));
     });
   });
+
+  group('RpcGenerator (generateResultModels)', () {
+    test('tableColumnsを持つ関数は型付き戻り値', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_my_invite_code',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(name: 'code', dataType: 'text'),
+            RpcTableColumn(
+              name: 'max_invites',
+              dataType: 'int4',
+            ),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      expect(
+        output,
+        contains('Future<List<GetMyInviteCodeResult>>'),
+      );
+      expect(
+        output,
+        contains(
+          'response.cast<Map<String, dynamic>>()',
+        ),
+      );
+      expect(
+        output,
+        contains(
+          '.map(GetMyInviteCodeResult.fromRow).toList()',
+        ),
+      );
+      // importが追加される
+      expect(
+        output,
+        contains(
+          "import 'get_my_invite_code_result.dart'",
+        ),
+      );
+    });
+
+    test('tableColumnsがない関数は従来通り', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_user_posts',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      expect(
+        output,
+        contains('Future<List<Map<String, dynamic>>>'),
+      );
+      expect(
+        output,
+        isNot(contains('GetUserPostsResult')),
+      );
+    });
+
+    test('generateResultModels=falseならtableColumnsを無視',
+        () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_data',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(name: 'id', dataType: 'int4'),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: false,
+      );
+
+      expect(
+        output,
+        contains('Future<List<Map<String, dynamic>>>'),
+      );
+      expect(
+        output,
+        isNot(contains('GetDataResult')),
+      );
+    });
+
+    test('型付きとMap混在', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_invite_code',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(name: 'code', dataType: 'text'),
+          ],
+        ),
+        RpcFunctionInfo(
+          name: 'get_user_posts',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+        RpcFunctionInfo(
+          name: 'count_items',
+          params: [],
+          returnType: 'int4',
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      expect(
+        output,
+        contains('Future<List<GetInviteCodeResult>>'),
+      );
+      expect(
+        output,
+        contains('Future<List<Map<String, dynamic>>>'),
+      );
+      expect(output, contains('Future<int>'));
+      // 型付き関数のimportのみ
+      expect(
+        output,
+        contains("import 'get_invite_code_result.dart'"),
+      );
+      expect(
+        output,
+        isNot(contains(
+          "import 'get_user_posts_result.dart'",
+        )),
+      );
+    });
+
+    test('resultModelsImportPrefixが適用される', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_stats',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(name: 'total', dataType: 'int4'),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+        resultModelsImportPrefix: '../models/',
+      );
+
+      expect(
+        output,
+        contains(
+          "import '../models/get_stats_result.dart'",
+        ),
+      );
+    });
+
+    test('パラメータ付き型付き関数', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_user_stats',
+          params: [
+            RpcParamInfo(
+              name: 'user_id',
+              dataType: 'uuid',
+              isRequired: true,
+            ),
+          ],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(name: 'posts', dataType: 'int4'),
+            RpcTableColumn(
+              name: 'followers',
+              dataType: 'int4',
+            ),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      expect(
+        output,
+        contains('Future<List<GetUserStatsResult>>'),
+      );
+      expect(output, contains('required String userId'));
+      expect(
+        output,
+        contains(
+          ".map(GetUserStatsResult.fromRow).toList()",
+        ),
+      );
+    });
+  });
 }

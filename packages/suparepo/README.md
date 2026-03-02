@@ -13,7 +13,7 @@ Generate repository, RPC client, and Edge Function client code from Supabase aut
 
 ```yaml
 dependencies:
-  suparepo: ^1.7.1
+  suparepo: ^1.8.0
 ```
 
 ## Quick Start
@@ -183,6 +183,61 @@ $$;
 Once created, no additional configuration is needed — suparepo automatically detects `execute_sql` and applies corrections. Functions using `RETURNS TABLE(...)` are automatically generated as `Future<List<Map<String, dynamic>>>`. If `execute_sql` does not exist, no error is raised and the OpenAPI spec results are used as-is.
 
 **Using both `return_types` and `execute_sql`:** When both are configured, functions listed in `return_types` use the YAML values, while all other functions are corrected via `execute_sql`.
+
+### Freezed Result Model Generation
+
+For `RETURNS TABLE(...)` functions, suparepo can automatically generate Freezed result model classes instead of returning `List<Map<String, dynamic>>`.
+
+**Configuration:**
+
+```yaml
+rpc:
+  enabled: true
+  generate_result_models: true
+  result_models_output: lib/models/rpc  # optional (default: same directory as rpc client)
+```
+
+**Example:** For a SQL function:
+
+```sql
+CREATE FUNCTION get_my_invite_code(user_id uuid)
+RETURNS TABLE(code text, max_invites int4, is_active bool)
+```
+
+suparepo generates a Freezed model (`get_my_invite_code_result.dart`):
+
+```dart
+@freezed
+abstract class GetMyInviteCodeResult with _$GetMyInviteCodeResult {
+  const factory GetMyInviteCodeResult({
+    required String code,
+    required int maxInvites,
+    required bool isActive,
+  }) = _GetMyInviteCodeResult;
+
+  factory GetMyInviteCodeResult.fromRow(Map<String, dynamic> row) =>
+      GetMyInviteCodeResult(
+        code: row['code'] as String,
+        maxInvites: row['max_invites'] as int,
+        isActive: row['is_active'] as bool,
+      );
+}
+```
+
+And the RPC client method returns the typed model:
+
+```dart
+Future<List<GetMyInviteCodeResult>> getMyInviteCode({
+  required String userId,
+}) async {
+  final response = await _client.rpc<List<dynamic>>('get_my_invite_code',
+      params: {'user_id': userId});
+  return response.cast<Map<String, dynamic>>()
+      .map(GetMyInviteCodeResult.fromRow).toList();
+}
+```
+
+> **Note:** Run `build_runner` after generation to create the `.freezed.dart` part files. Requires `execute_sql` RPC function for TABLE column detection.
 
 ## Edge Function Client Generation
 
@@ -526,6 +581,8 @@ rpc:
     get_invite_code: text
     is_active: bool
     get_items: setof jsonb
+  generate_result_models: true  # Generate Freezed result models for RETURNS TABLE functions (default: false)
+  result_models_output: lib/models/rpc  # Custom output directory for result models (optional)
 
 # Edge Function client
 edge_functions:

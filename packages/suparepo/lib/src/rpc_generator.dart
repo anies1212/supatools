@@ -1,6 +1,7 @@
 import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'config_loader.dart';
+import 'rpc_result_model_generator.dart';
 
 /// Dart reserved words that need escaping in parameter names
 const Set<String> _dartReservedWords = {
@@ -88,10 +89,17 @@ List<RpcFunctionInfo> applyReturnTypeOverrides(
 
 /// Generates a Supabase RPC client class from RPC function info
 class RpcGenerator {
-  /// Generates the full RPC client file content
+  bool _generateResultModels = false;
+  /// Generates the full RPC client file content.
+  ///
+  /// When [generateResultModels] is true, functions with
+  /// [tableColumns] use typed result model classes instead
+  /// of `Map<String, dynamic>`.
   String generateRpcClient(
     List<RpcFunctionInfo> functions, {
     String supabaseImport = defaultSupabaseImport,
+    bool generateResultModels = false,
+    String? resultModelsImportPrefix,
   }) {
     final buffer = StringBuffer();
 
@@ -114,6 +122,20 @@ class RpcGenerator {
 
     // Imports
     buffer.writeln("import '$supabaseImport';");
+
+    // Import result model files
+    if (generateResultModels) {
+      final prefix = resultModelsImportPrefix ?? '';
+      for (final func in functions) {
+        if (func.tableColumns != null &&
+            func.tableColumns!.isNotEmpty) {
+          final fileName =
+              RpcResultModelGenerator.resultFileName(func.name);
+          buffer.writeln("import '$prefix$fileName';");
+        }
+      }
+    }
+
     buffer.writeln();
 
     // Class definition
@@ -123,6 +145,7 @@ class RpcGenerator {
     buffer.writeln();
     buffer.writeln('  const SupabaseRpcClient(this._client);');
 
+    _generateResultModels = generateResultModels;
     for (final func in functions) {
       buffer.writeln();
       _generateMethod(buffer, func);
@@ -230,7 +253,19 @@ class RpcGenerator {
     String dartReturnType,
   ) {
     // void and scalar are handled inline (await / return await)
-    if (!func.returnsSetOf) return;
+    if (!func.returnsSetOf && !_hasResultModel(func)) return;
+
+    if (_hasResultModel(func)) {
+      final className =
+          RpcResultModelGenerator.resultClassName(func.name);
+      buffer.writeln(
+        '    return response.cast<Map<String, dynamic>>()',
+      );
+      buffer.writeln(
+        '        .map($className.fromRow).toList();',
+      );
+      return;
+    }
 
     final itemType = TypeMapper.mapType(func.returnType);
     buffer.writeln(
@@ -238,8 +273,20 @@ class RpcGenerator {
     );
   }
 
+  /// Whether the function should use a typed result model.
+  bool _hasResultModel(RpcFunctionInfo func) =>
+      _generateResultModels &&
+      func.tableColumns != null &&
+      func.tableColumns!.isNotEmpty;
+
   String _buildReturnType(RpcFunctionInfo func) {
     if (func.returnType == 'void') return 'void';
+
+    if (_hasResultModel(func)) {
+      final className =
+          RpcResultModelGenerator.resultClassName(func.name);
+      return 'List<$className>';
+    }
 
     final dartType = TypeMapper.mapType(func.returnType);
     if (func.returnsSetOf) {

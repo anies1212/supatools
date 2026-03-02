@@ -489,6 +489,129 @@ void main() {
       expect(result[2].returnType, 'void');
     });
   });
+
+  group('mergeTableColumns', () {
+    test('該当する関数にtableColumnsをマージ', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_invite_code',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+        RpcFunctionInfo(
+          name: 'count_items',
+          params: [],
+          returnType: 'int4',
+        ),
+      ];
+      final tableColumnsMap = {
+        'get_invite_code': [
+          RpcTableColumn(name: 'code', dataType: 'text'),
+          RpcTableColumn(name: 'max_invites', dataType: 'int4'),
+        ],
+      };
+
+      final result = SchemaFetcher.mergeTableColumns(
+        functions,
+        tableColumnsMap,
+      );
+
+      expect(result[0].tableColumns, isNotNull);
+      expect(result[0].tableColumns, hasLength(2));
+      expect(result[0].tableColumns![0].name, 'code');
+      expect(result[0].tableColumns![0].dataType, 'text');
+      expect(result[0].tableColumns![1].name, 'max_invites');
+      expect(result[0].tableColumns![1].dataType, 'int4');
+      expect(result[1].tableColumns, isNull);
+    });
+
+    test('空のマップでも壊れない', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'my_func',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final tableColumnsMap =
+          <String, List<RpcTableColumn>>{};
+
+      final result = SchemaFetcher.mergeTableColumns(
+        functions,
+        tableColumnsMap,
+      );
+
+      expect(result[0].tableColumns, isNull);
+    });
+
+    test('複数関数への一括マージ', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'func_a',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+        RpcFunctionInfo(
+          name: 'func_b',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+      ];
+      final tableColumnsMap = {
+        'func_a': [
+          RpcTableColumn(name: 'id', dataType: 'int4'),
+        ],
+        'func_b': [
+          RpcTableColumn(name: 'name', dataType: 'text'),
+          RpcTableColumn(name: 'active', dataType: 'bool'),
+        ],
+      };
+
+      final result = SchemaFetcher.mergeTableColumns(
+        functions,
+        tableColumnsMap,
+      );
+
+      expect(result[0].tableColumns, hasLength(1));
+      expect(result[1].tableColumns, hasLength(2));
+    });
+
+    test('既存のreturnType/returnsSetOfは維持される', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_data',
+          params: [
+            RpcParamInfo(
+              name: 'user_id',
+              dataType: 'uuid',
+            ),
+          ],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          description: 'Get data',
+        ),
+      ];
+      final tableColumnsMap = {
+        'get_data': [
+          RpcTableColumn(name: 'col1', dataType: 'text'),
+        ],
+      };
+
+      final result = SchemaFetcher.mergeTableColumns(
+        functions,
+        tableColumnsMap,
+      );
+
+      expect(result[0].returnType, 'jsonb');
+      expect(result[0].returnsSetOf, isTrue);
+      expect(result[0].description, 'Get data');
+      expect(result[0].params, hasLength(1));
+      expect(result[0].tableColumns, hasLength(1));
+    });
+  });
 }
 
 Map<String, dynamic> _buildSpec(Map<String, dynamic> paths) {

@@ -88,6 +88,20 @@ class TableInfo {
   String toString() => 'TableInfo(name: $name, columns: $columns)';
 }
 
+/// Represents a column in a RETURNS TABLE definition
+class RpcTableColumn {
+  final String name;
+  final String dataType;
+
+  const RpcTableColumn({
+    required this.name,
+    required this.dataType,
+  });
+
+  @override
+  String toString() => 'RpcTableColumn($name: $dataType)';
+}
+
 /// Represents a parameter for an RPC function
 class RpcParamInfo {
   final String name;
@@ -112,17 +126,23 @@ class RpcFunctionInfo {
   final bool returnsSetOf;
   final String? description;
 
+  /// Column definitions for RETURNS TABLE functions.
+  /// Non-null when the function uses `RETURNS TABLE(col1 type1, ...)`.
+  final List<RpcTableColumn>? tableColumns;
+
   const RpcFunctionInfo({
     required this.name,
     required this.params,
     required this.returnType,
     this.returnsSetOf = false,
     this.description,
+    this.tableColumns,
   });
 
   RpcFunctionInfo copyWith({
     String? returnType,
     bool? returnsSetOf,
+    List<RpcTableColumn>? tableColumns,
   }) =>
       RpcFunctionInfo(
         name: name,
@@ -130,6 +150,7 @@ class RpcFunctionInfo {
         returnType: returnType ?? this.returnType,
         returnsSetOf: returnsSetOf ?? this.returnsSetOf,
         description: description,
+        tableColumns: tableColumns ?? this.tableColumns,
       );
 
   @override
@@ -310,7 +331,16 @@ class SchemaFetcher {
 
     try {
       final pgReturnTypes = await _fetchRpcReturnTypes();
-      return mergeReturnTypes(functions, pgReturnTypes);
+      var merged = mergeReturnTypes(functions, pgReturnTypes);
+
+      try {
+        final tableColumnsMap = await _fetchRpcTableColumns();
+        merged = mergeTableColumns(merged, tableColumnsMap);
+      } catch (_) {
+        // TABLE列情報の取得に失敗しても続行
+      }
+
+      return merged;
     } catch (_) {
       return functions;
     }
@@ -380,6 +410,75 @@ class SchemaFetcher {
         returnType: pgInfo.typeName,
         returnsSetOf: pgInfo.returnsSet,
       );
+    }).toList();
+  }
+
+  /// Fetches TABLE column info from `pg_proc` catalog for
+  /// functions that use `RETURNS TABLE(...)`.
+  Future<Map<String, List<RpcTableColumn>>>
+      _fetchRpcTableColumns() async {
+    final query = '''
+      SELECT json_agg(sub) FROM (
+        SELECT
+          p.proname AS function_name,
+          p.proargmodes::text[] AS arg_modes,
+          p.proargnames::text[] AS arg_names,
+          (SELECT json_agg(t2.typname ORDER BY ordinality)
+           FROM unnest(p.proallargtypes)
+             WITH ORDINALITY AS u(type_oid, ordinality)
+           JOIN pg_type t2 ON t2.oid = u.type_oid
+          ) AS arg_type_names
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = '$schema'
+          AND p.proargmodes IS NOT NULL
+          AND 't' = ANY(p.proargmodes)
+      ) sub
+    ''';
+
+    final response = await _executeRawQuery(query);
+    final result = <String, List<RpcTableColumn>>{};
+
+    final rows = response is List ? response : <dynamic>[];
+    for (final row in rows) {
+      final funcName = row['function_name'] as String;
+      final argModes =
+          (row['arg_modes'] as List).cast<String>();
+      final argNames =
+          (row['arg_names'] as List).cast<String>();
+      final argTypeNames =
+          (row['arg_type_names'] as List).cast<String>();
+
+      final columns = <RpcTableColumn>[];
+      for (var i = 0; i < argModes.length; i++) {
+        if (argModes[i] == 't') {
+          columns.add(RpcTableColumn(
+            name: argNames[i],
+            dataType: argTypeNames[i],
+          ));
+        }
+      }
+
+      if (columns.isNotEmpty) {
+        result[funcName] = columns;
+      }
+    }
+
+    return result;
+  }
+
+  /// Merges TABLE column info into [RpcFunctionInfo] list.
+  ///
+  /// For functions whose name appears in [tableColumnsMap],
+  /// sets `tableColumns` on the matching [RpcFunctionInfo].
+  static List<RpcFunctionInfo> mergeTableColumns(
+    List<RpcFunctionInfo> functions,
+    Map<String, List<RpcTableColumn>> tableColumnsMap,
+  ) {
+    return functions.map((func) {
+      final columns = tableColumnsMap[func.name];
+      if (columns == null) return func;
+      return func.copyWith(tableColumns: columns);
     }).toList();
   }
 

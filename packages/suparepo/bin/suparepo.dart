@@ -5,6 +5,7 @@ import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'package:suparepo/src/config_loader.dart';
 import 'package:suparepo/src/repository_generator.dart';
 import 'package:suparepo/src/rpc_generator.dart';
+import 'package:suparepo/src/rpc_result_model_generator.dart';
 import 'package:suparepo/src/edge_function_detector.dart';
 import 'package:suparepo/src/edge_function_generator.dart';
 import 'package:suparepo/src/ts_type_extractor.dart';
@@ -177,10 +178,50 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     '${filtered.map((f) => f.name).join(', ')}',
   );
 
+  var generated = 0;
+
+  // Generate result models if enabled
+  final generateModels = config.rpc.generateResultModels;
+  String? resultModelsImportPrefix;
+
+  if (generateModels) {
+    final modelGenerator = RpcResultModelGenerator();
+    final modelFiles =
+        modelGenerator.generateAllResultModels(filtered);
+
+    if (modelFiles.isNotEmpty) {
+      final rpcOutputPath = config.rpc.output ??
+          p.join(config.output, 'rpc_client.dart');
+      final rpcDir = p.dirname(rpcOutputPath);
+      final modelsDir =
+          config.rpc.resultModelsOutput ?? rpcDir;
+
+      final modelsDirectory = Directory(modelsDir);
+      if (!await modelsDirectory.exists()) {
+        await modelsDirectory.create(recursive: true);
+      }
+
+      for (final entry in modelFiles.entries) {
+        final modelPath = p.join(modelsDir, entry.key);
+        await File(modelPath).writeAsString(entry.value);
+        print('✨ Generated: $modelPath');
+        generated++;
+      }
+
+      // Compute import prefix for RPC client
+      if (modelsDir != rpcDir) {
+        resultModelsImportPrefix =
+            '${p.relative(modelsDir, from: rpcDir)}/';
+      }
+    }
+  }
+
   final generator = RpcGenerator();
   final content = generator.generateRpcClient(
     filtered,
     supabaseImport: config.supabaseImport,
+    generateResultModels: generateModels,
+    resultModelsImportPrefix: resultModelsImportPrefix,
   );
 
   final outputPath =
@@ -191,7 +232,7 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
   await outputFile.writeAsString(content);
   print('✨ Generated: $outputPath');
 
-  return 1;
+  return generated + 1;
 }
 
 Future<int> _generateEdgeFunctionClient(

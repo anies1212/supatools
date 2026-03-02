@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.2] - 2026-03-03
+
+### Fixed
+
+- RPC functions using `RETURNS TABLE(...)` are now correctly generated as `Future<List<Map<String, dynamic>>>` instead of `Future<void>`
+  - PostgreSQL internally represents `RETURNS TABLE` as `record` + `proretset = true`, which was previously treated as void
+
+### Changed
+
+- Bumped `supabase_schema_core` dependency to `^1.2.2`
+
 ## [1.7.1] - 2026-02-23
 
 ### Fixed

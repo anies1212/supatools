@@ -369,7 +369,11 @@ class SchemaFetcher {
       final pgInfo = pgReturnTypes[func.name];
       if (pgInfo == null) return func;
 
-      // record type is equivalent to void; skip correction
+      // record + returnsSet means RETURNS TABLE(...) → setof jsonb
+      if (pgInfo.typeName == 'record' && pgInfo.returnsSet) {
+        return func.copyWith(returnType: 'jsonb', returnsSetOf: true);
+      }
+      // record without setof is equivalent to void; skip correction
       if (pgInfo.typeName == 'record') return func;
 
       return func.copyWith(

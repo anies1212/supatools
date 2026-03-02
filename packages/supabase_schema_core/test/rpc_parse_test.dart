@@ -393,7 +393,7 @@ void main() {
       expect(result[0].returnType, 'void');
     });
 
-    test('record型はvoidのまま維持', () {
+    test('record型(非setof)はvoidのまま維持', () {
       final functions = [
         RpcFunctionInfo(
           name: 'do_something',
@@ -411,6 +411,27 @@ void main() {
       );
 
       expect(result[0].returnType, 'void');
+    });
+
+    test('record型 + returnsSet(RETURNS TABLE)はsetof jsonbに補正', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_statuses',
+          params: [],
+          returnType: 'void',
+        ),
+      ];
+      final pgTypes = {
+        'get_statuses': (typeName: 'record', returnsSet: true),
+      };
+
+      final result = SchemaFetcher.mergeReturnTypes(
+        functions,
+        pgTypes,
+      );
+
+      expect(result[0].returnType, 'jsonb');
+      expect(result[0].returnsSetOf, isTrue);
     });
 
     test('returnsSetも補正される', () {

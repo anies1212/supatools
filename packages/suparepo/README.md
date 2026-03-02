@@ -110,7 +110,7 @@ class SupabaseRpcClient {
 
 ### Return Type Correction
 
-PostgREST's OpenAPI spec does not always return accurate type information for RPC functions with scalar return values (`boolean`, `integer`, `text`, etc.). As a result, methods that should be `Future<bool>` or `Future<String>` may be generated as `Future<void>`.
+PostgREST's OpenAPI spec does not always return accurate type information for RPC functions with scalar return values (`boolean`, `integer`, `text`, etc.) or `RETURNS TABLE(...)` functions. As a result, methods that should be `Future<bool>`, `Future<String>`, or `Future<List<Map<String, dynamic>>>` may be generated as `Future<void>`.
 
 suparepo resolves return types in the following priority order:
 
@@ -180,7 +180,7 @@ $$;
 
 > **Warning:** This function runs with `SECURITY DEFINER` privileges. Ensure it is only callable with the service_role key (which suparepo uses via `secret_key`). Review your RLS policies and API exposure settings to prevent unauthorized access.
 
-Once created, no additional configuration is needed — suparepo automatically detects `execute_sql` and applies corrections. If `execute_sql` does not exist, no error is raised and the OpenAPI spec results are used as-is.
+Once created, no additional configuration is needed — suparepo automatically detects `execute_sql` and applies corrections. Functions using `RETURNS TABLE(...)` are automatically generated as `Future<List<Map<String, dynamic>>>`. If `execute_sql` does not exist, no error is raised and the OpenAPI spec results are used as-is.
 
 **Using both `return_types` and `execute_sql`:** When both are configured, functions listed in `return_types` use the YAML values, while all other functions are corrected via `execute_sql`.
 

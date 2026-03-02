@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.2] - 2026-03-03
+
+### Fixed
+
+- `mergeReturnTypes()` now correctly handles `RETURNS TABLE(...)` functions — previously treated as `void` because `pg_proc` reports them as `record` type, now detected as `setof jsonb` when `proretset = true`
+
 ## [1.2.1] - 2026-02-23
 
 ### Fixed

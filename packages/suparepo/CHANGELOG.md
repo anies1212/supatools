@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.1] - 2026-03-03
+
+### Fixed
+
+- `fromRow()` の DateTime 型フィールドで `as DateTime` キャストが実行時エラーになるバグを修正
+  - Supabase RPC の JSON レスポンスではタイムスタンプが文字列として返されるため、`DateTime.parse(row['col'] as String)` に変更
+
 ## [1.8.0] - 2026-03-03
 
 ### Added

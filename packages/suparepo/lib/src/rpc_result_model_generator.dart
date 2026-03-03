@@ -27,8 +27,7 @@ class RpcResultModelGenerator {
     if (columns == null || columns.isEmpty) return null;
 
     final className = resultClassName(func.name);
-    final freezedPart =
-        '${func.name}_result.freezed.dart';
+    final freezedPart = '${func.name}_result.freezed.dart';
 
     final buffer = StringBuffer();
 
@@ -81,9 +80,16 @@ class RpcResultModelGenerator {
     for (final col in columns) {
       final fieldName = ReCase(col.name).camelCase;
       final dartType = TypeMapper.mapType(col.dataType);
-      buffer.writeln(
-        "        $fieldName: row['${col.name}'] as $dartType,",
-      );
+      if (dartType == 'DateTime') {
+        buffer.writeln(
+          "        $fieldName: "
+          "DateTime.parse(row['${col.name}'] as String),",
+        );
+      } else {
+        buffer.writeln(
+          "        $fieldName: row['${col.name}'] as $dartType,",
+        );
+      }
     }
 
     buffer.writeln('      );');

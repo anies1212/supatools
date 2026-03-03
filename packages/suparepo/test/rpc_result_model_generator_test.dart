@@ -171,7 +171,8 @@ void main() {
       expect(
         output,
         contains(
-          "createdAt: row['created_at'] as DateTime,",
+          "createdAt: DateTime.parse("
+          "row['created_at'] as String),",
         ),
       );
     });
@@ -248,8 +249,7 @@ void main() {
         ),
       ];
 
-      final result =
-          generator.generateAllResultModels(functions);
+      final result = generator.generateAllResultModels(functions);
 
       expect(result, hasLength(2));
       expect(
@@ -275,8 +275,7 @@ void main() {
         ),
       ];
 
-      final result =
-          generator.generateAllResultModels(functions);
+      final result = generator.generateAllResultModels(functions);
 
       expect(result, isEmpty);
     });

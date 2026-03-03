@@ -478,8 +478,7 @@ void main() {
       );
     });
 
-    test('generateResultModels=falseならtableColumnsを無視',
-        () {
+    test('generateResultModels=falseならtableColumnsを無視', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_data',

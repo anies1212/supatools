@@ -90,6 +90,7 @@ List<RpcFunctionInfo> applyReturnTypeOverrides(
 /// Generates a Supabase RPC client class from RPC function info
 class RpcGenerator {
   bool _generateResultModels = false;
+
   /// Generates the full RPC client file content.
   ///
   /// When [generateResultModels] is true, functions with
@@ -127,10 +128,8 @@ class RpcGenerator {
     if (generateResultModels) {
       final prefix = resultModelsImportPrefix ?? '';
       for (final func in functions) {
-        if (func.tableColumns != null &&
-            func.tableColumns!.isNotEmpty) {
-          final fileName =
-              RpcResultModelGenerator.resultFileName(func.name);
+        if (func.tableColumns != null && func.tableColumns!.isNotEmpty) {
+          final fileName = RpcResultModelGenerator.resultFileName(func.name);
           buffer.writeln("import '$prefix$fileName';");
         }
       }
@@ -256,8 +255,7 @@ class RpcGenerator {
     if (!func.returnsSetOf && !_hasResultModel(func)) return;
 
     if (_hasResultModel(func)) {
-      final className =
-          RpcResultModelGenerator.resultClassName(func.name);
+      final className = RpcResultModelGenerator.resultClassName(func.name);
       buffer.writeln(
         '    return response.cast<Map<String, dynamic>>()',
       );
@@ -283,8 +281,7 @@ class RpcGenerator {
     if (func.returnType == 'void') return 'void';
 
     if (_hasResultModel(func)) {
-      final className =
-          RpcResultModelGenerator.resultClassName(func.name);
+      final className = RpcResultModelGenerator.resultClassName(func.name);
       return 'List<$className>';
     }
 

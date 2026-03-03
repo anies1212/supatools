@@ -186,15 +186,13 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
 
   if (generateModels) {
     final modelGenerator = RpcResultModelGenerator();
-    final modelFiles =
-        modelGenerator.generateAllResultModels(filtered);
+    final modelFiles = modelGenerator.generateAllResultModels(filtered);
 
     if (modelFiles.isNotEmpty) {
-      final rpcOutputPath = config.rpc.output ??
-          p.join(config.output, 'rpc_client.dart');
+      final rpcOutputPath =
+          config.rpc.output ?? p.join(config.output, 'rpc_client.dart');
       final rpcDir = p.dirname(rpcOutputPath);
-      final modelsDir =
-          config.rpc.resultModelsOutput ?? rpcDir;
+      final modelsDir = config.rpc.resultModelsOutput ?? rpcDir;
 
       final modelsDirectory = Directory(modelsDir);
       if (!await modelsDirectory.exists()) {
@@ -210,8 +208,7 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
 
       // Compute import prefix for RPC client
       if (modelsDir != rpcDir) {
-        resultModelsImportPrefix =
-            '${p.relative(modelsDir, from: rpcDir)}/';
+        resultModelsImportPrefix = '${p.relative(modelsDir, from: rpcDir)}/';
       }
     }
   }

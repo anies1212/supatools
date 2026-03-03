@@ -53,8 +53,7 @@ export 'src/config_loader.dart'
     show SuparepoConfigLoader, SuparepoConfig, RpcConfig, EdgeFunctionConfig;
 export 'src/repository_generator.dart' show RepositoryGenerator;
 export 'src/rpc_generator.dart' show RpcGenerator;
-export 'src/rpc_result_model_generator.dart'
-    show RpcResultModelGenerator;
+export 'src/rpc_result_model_generator.dart' show RpcResultModelGenerator;
 export 'src/edge_function_detector.dart' show EdgeFunctionDetector;
 export 'src/edge_function_generator.dart' show EdgeFunctionGenerator;
 export 'src/edge_function_info.dart'

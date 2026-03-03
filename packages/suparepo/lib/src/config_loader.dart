@@ -61,10 +61,8 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       include: parseStringList(value['include']),
       exclude: parseStringList(value['exclude']),
       returnTypes: _parseReturnTypes(value['return_types']),
-      generateResultModels:
-          value['generate_result_models'] == true,
-      resultModelsOutput:
-          value['result_models_output']?.toString(),
+      generateResultModels: value['generate_result_models'] == true,
+      resultModelsOutput: value['result_models_output']?.toString(),
     );
   }
 

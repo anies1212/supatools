@@ -118,7 +118,15 @@ void main() {
       expect(output, contains('request.toJson()'));
       expect(
         output,
-        contains('SendEmailResponse.fromJson'),
+        contains('SendEmailResponse.fromJson(json)'),
+      );
+      // response.dataの型を動的に判定するコードが含まれる
+      expect(output, contains('final data = response.data;'));
+      expect(output, contains('data is List<int>'));
+      expect(output, contains('utf8.decode(data)'));
+      expect(
+        output,
+        contains('data as Map<String, dynamic>'),
       );
     });
 

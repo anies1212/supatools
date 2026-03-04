@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.2] - 2026-03-04
+
+### Fixed
+
+- Edge Function クライアントの `response.data` 型キャストエラーを修正
+  - Supabase SDK が `Content-Type: application/json` のレスポンスを自動デコードし `Map<String, dynamic>` を返す場合、`as List<int>` キャストで実行時エラーが発生していた
+  - `response.data` の実際の型を動的に判定し、`List<int>`（バイト列）と `Map<String, dynamic>`（デコード済み）の両方に対応
+
 ## [1.8.1] - 2026-03-03
 
 ### Fixed

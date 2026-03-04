@@ -153,10 +153,19 @@ class EdgeFunctionGenerator {
     buffer.writeln('    );');
 
     if (hasResponse) {
+      buffer.writeln('    final data = response.data;');
       buffer.writeln(
-        '    return ${baseName}Response.fromJson('
-        'jsonDecode(utf8.decode(response.data as List<int>)) '
-        'as Map<String, dynamic>);',
+        '    final json = data is List<int>',
+      );
+      buffer.writeln(
+        '        ? jsonDecode(utf8.decode(data))'
+        ' as Map<String, dynamic>',
+      );
+      buffer.writeln(
+        '        : data as Map<String, dynamic>;',
+      );
+      buffer.writeln(
+        '    return ${baseName}Response.fromJson(json);',
       );
     } else {
       buffer.writeln('    return response;');

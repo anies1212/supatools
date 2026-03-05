@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.3] - 2026-03-05
+
+### Fixed
+
+- Edge Function エラークラスの `fromFunctionException` で `e.details` が `Map<String, dynamic>` の場合に `as String` キャストで実行時エラーになるバグを修正
+  - Supabase SDK が JSON レスポンスを自動デコードし `Map<String, dynamic>` を返す場合に対応
+  - `e.details` の実際の型を switch 式で判定し、`String`（未デコード）と `Map<String, dynamic>`（デコード済み）の両方に対応
+
 ## [1.8.2] - 2026-03-04
 
 ### Fixed

@@ -382,7 +382,8 @@ void main() {
         ),
       );
       expect(output, contains('FunctionException e'));
-      expect(output, contains('jsonDecode(e.details as String)'));
+      expect(output, contains('final details = e.details;'));
+      expect(output, contains('final body = switch (details) {'));
       expect(
         output,
         contains("'outside_time_window' =>"),

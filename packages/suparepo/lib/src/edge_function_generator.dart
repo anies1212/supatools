@@ -321,10 +321,17 @@ class EdgeFunctionGenerator {
     );
     buffer.writeln('    FunctionException e,');
     buffer.writeln('  ) {');
+    buffer.writeln('    final details = e.details;');
+    buffer.writeln('    final body = switch (details) {');
     buffer.writeln(
-      '    final body = jsonDecode(e.details as String)',
+      '      final String s => jsonDecode(s)'
+      ' as Map<String, dynamic>,',
     );
-    buffer.writeln('        as Map<String, dynamic>;');
+    buffer.writeln(
+      '      final Map<String, dynamic> m => m,',
+    );
+    buffer.writeln('      _ => <String, dynamic>{},');
+    buffer.writeln('    };');
     buffer.writeln(
       "    final code = body['error'] as String? ?? '';",
     );

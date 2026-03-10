@@ -1,6 +1,7 @@
 import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'config_loader.dart';
+import 'custom_method_migrator.dart';
 
 /// Generates repository code from table information
 class RepositoryGenerator {
@@ -35,8 +36,15 @@ class RepositoryGenerator {
     return '${ReCase(tableName).snakeCase}_repository.dart';
   }
 
-  /// Generates a repository file content for a single table
-  String generateRepository(TableInfo table) {
+  /// Generates a repository file content for a single table.
+  ///
+  /// When [customContent] is provided, the custom methods/fields from
+  /// the `.custom.dart` extension file are embedded as real instance
+  /// methods in the generated class.
+  String generateRepository(
+    TableInfo table, {
+    CustomFileContent? customContent,
+  }) {
     final modelClassName = getModelClassName(table.name);
     final repoClassName = getRepositoryClassName(table.name);
     final tableName = table.name;
@@ -84,6 +92,13 @@ class RepositoryGenerator {
       );
     } else if (_hasModelImport) {
       buffer.writeln("import '${_config!.modelImportPath}';");
+    }
+
+    // Custom imports from .custom.dart
+    if (customContent != null) {
+      for (final imp in customContent.imports) {
+        buffer.writeln(imp);
+      }
     }
 
     if (_config?.generateProviders == true) {
@@ -284,6 +299,12 @@ class RepositoryGenerator {
       }
     }
 
+    // Embed custom methods from .custom.dart as instance methods
+    if (customContent != null) {
+      buffer.writeln();
+      buffer.write(customContent.body);
+    }
+
     buffer.writeln('}');
 
     // Generate Riverpod provider if enabled
@@ -313,13 +334,22 @@ class RepositoryGenerator {
     return columnName;
   }
 
-  /// Generates all repositories and returns a map of filename to content
-  Map<String, String> generateAllRepositories(List<TableInfo> tables) {
+  /// Generates all repositories and returns a map of filename to content.
+  ///
+  /// When [customContents] is provided, maps table name to custom file
+  /// content for embedding.
+  Map<String, String> generateAllRepositories(
+    List<TableInfo> tables, {
+    Map<String, CustomFileContent> customContents = const {},
+  }) {
     final result = <String, String>{};
 
     for (final table in tables) {
       final fileName = getFileName(table.name);
-      result[fileName] = generateRepository(table);
+      result[fileName] = generateRepository(
+        table,
+        customContent: customContents[table.name],
+      );
     }
 
     // Generate barrel file if enabled

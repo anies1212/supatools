@@ -215,8 +215,36 @@ Future<int> _generateRepositories(
     }
   }
 
+  // .custom.dartファイルからカスタムメソッドを読み取り、
+  // 生成されるリポジトリクラスに埋め込む
+  final customContents = <String, CustomFileContent>{};
+  final embedMigrator = CustomMethodMigrator();
+
+  for (final table in filtered) {
+    final customFileName = embedMigrator.getCustomFileName(table.name);
+    final customFilePath = p.join(outputDir, customFileName);
+    final customFile = File(customFilePath);
+
+    if (!await customFile.exists()) continue;
+
+    final customCode = await customFile.readAsString();
+    final repoFileName = generator.getFileName(table.name);
+    final content = embedMigrator.extractFromCustomFile(
+      customCode,
+      repoFileName,
+    );
+
+    if (content != null) {
+      customContents[table.name] = content;
+      print('📎 Embedding custom methods: $customFileName');
+    }
+  }
+
   // リポジトリ生成（上書き）
-  final files = generator.generateAllRepositories(filtered);
+  final files = generator.generateAllRepositories(
+    filtered,
+    customContents: customContents,
+  );
 
   for (final entry in files.entries) {
     final filePath = p.join(outputDir, entry.key);

@@ -1,5 +1,7 @@
+import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'package:test/test.dart';
 import 'package:suparepo/src/custom_method_migrator.dart';
+import 'package:suparepo/src/repository_generator.dart';
 
 void main() {
   late CustomMethodMigrator migrator;
@@ -686,6 +688,78 @@ class TestRepo {
     });
   });
 
+  group('extractFromCustomFile', () {
+    test('extension本体とimportを正しく抽出', () {
+      const customCode = '''
+// Custom methods migrated from TestRepository
+// This file is auto-migrated by suparepo and will NOT be overwritten.
+// ignore_for_file: type=lint
+
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:data/some_model.dart';
+import 'test_repository.dart';
+
+extension TestRepositoryCustom on TestRepository {
+  static const _joinSelect = 'id, name, products(*)';
+
+  /// アクティブなレコードを取得
+  Future<List<Map<String, dynamic>>> getActive() async {
+    final response = await client
+        .from(tableName)
+        .select(_joinSelect)
+        .eq('is_active', true);
+    return response;
+  }
+}
+''';
+
+      final result = migrator.extractFromCustomFile(
+        customCode,
+        'test_repository.dart',
+      );
+
+      expect(result, isNotNull);
+      // supabase importとself-importは除外
+      expect(result!.imports, hasLength(1));
+      expect(
+        result.imports.first,
+        "import 'package:data/some_model.dart';",
+      );
+      // extension本体にメソッドとフィールドが含まれる
+      expect(result.body, contains('_joinSelect'));
+      expect(result.body, contains('getActive'));
+      expect(result.body, contains('アクティブなレコードを取得'));
+    });
+
+    test('空のextension → null', () {
+      const customCode = '''
+extension TestRepositoryCustom on TestRepository {
+}
+''';
+
+      final result = migrator.extractFromCustomFile(
+        customCode,
+        'test_repository.dart',
+      );
+
+      expect(result, isNull);
+    });
+
+    test('extensionなし → null', () {
+      const customCode = '''
+// Just a comment
+import 'test_repository.dart';
+''';
+
+      final result = migrator.extractFromCustomFile(
+        customCode,
+        'test_repository.dart',
+      );
+
+      expect(result, isNull);
+    });
+  });
+
   group('_client → client 置換', () {
     test('メソッド内の_clientがclientに置換される', () {
       final methods = [
@@ -708,6 +782,56 @@ class TestRepo {
 
       expect(code, contains('await client.from'));
       expect(code, isNot(contains('_client')));
+    });
+  });
+
+  group('カスタムメソッド埋め込み（RepositoryGenerator連携）', () {
+    test('customContentが生成されるクラスに埋め込まれる', () {
+      final generator = RepositoryGenerator();
+      final table = TableInfo(
+        name: 'test_table',
+        columns: [
+          ColumnInfo(
+            name: 'id',
+            dataType: 'uuid',
+            isNullable: false,
+            isPrimaryKey: true,
+          ),
+        ],
+      );
+
+      const customContent = CustomFileContent(
+        body: '''
+  static const _joinSelect = 'id, name, products(*)';
+
+  /// アクティブなレコードを取得
+  Future<List<Map<String, dynamic>>> getActive() async {
+    final response = await client
+        .from(tableName)
+        .select(_joinSelect)
+        .eq('is_active', true);
+    return response;
+  }
+''',
+        imports: [
+          "import 'package:data/some_model.dart';",
+        ],
+      );
+
+      final code = generator.generateRepository(
+        table,
+        customContent: customContent,
+      );
+
+      // カスタムimportが含まれる
+      expect(code, contains("import 'package:data/some_model.dart';"));
+      // カスタムメソッドがクラス内に埋め込まれる
+      expect(code, contains('getActive'));
+      expect(code, contains('_joinSelect'));
+      // extensionではなくクラス内に存在する
+      expect(code, isNot(contains('extension ')));
+      // クラス定義がある
+      expect(code, contains('class TestTableRepository'));
     });
   });
 }

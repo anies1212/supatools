@@ -28,6 +28,17 @@ class MigrationResult {
   bool get hasCustomCode => customMethods.isNotEmpty;
 }
 
+/// .custom.dartファイルから抽出した埋め込み用コンテンツ
+class CustomFileContent {
+  /// extension本体（`{ }` の中身）
+  final String body;
+
+  /// 生成ファイルに追加するimport文
+  final List<String> imports;
+
+  const CustomFileContent({required this.body, required this.imports});
+}
+
 /// 既存extensionファイルとのマージ結果
 class MergeResult {
   final String mergedCode;
@@ -200,6 +211,33 @@ class CustomMethodMigrator {
     return buffer.toString();
   }
 
+  /// .custom.dartファイル（extension形式）からメソッドとimportを抽出。
+  /// 生成されたリポジトリクラスに埋め込むために使用する。
+  CustomFileContent? extractFromCustomFile(
+    String customCode,
+    String repositoryFileName,
+  ) {
+    final allImports = _extractImports(customCode);
+    final imports = allImports.where((imp) {
+      // 自身のリポジトリimportを除外
+      if (imp.contains(repositoryFileName)) return false;
+      // 標準的な自動生成importを除外
+      for (final pattern in _generatedImportPatterns) {
+        if (pattern.hasMatch(imp)) return false;
+      }
+      // supabaseClientProviderのimportを除外
+      if (imp.contains('supabase_client_provider')) return false;
+      // supabase_flutter importは生成ファイルに含まれるため除外
+      if (imp.contains('package:supabase')) return false;
+      return true;
+    }).toList();
+
+    final body = _extractExtensionBody(customCode);
+    if (body == null || body.trim().isEmpty) return null;
+
+    return CustomFileContent(body: body, imports: imports);
+  }
+
   /// 既存のextensionファイルとマージ
   MergeResult mergeWithExisting(
     String existingCustomCode,
@@ -287,7 +325,18 @@ class CustomMethodMigrator {
     final classPattern = RegExp(
       'class\\s+${RegExp.escape(className)}\\s*\\{',
     );
-    final match = classPattern.firstMatch(source);
+    return _extractBodyAfterBrace(source, classPattern);
+  }
+
+  /// extension本体を抽出
+  String? _extractExtensionBody(String source) {
+    final pattern = RegExp(r'extension\s+\w+\s+on\s+\w+\s*\{');
+    return _extractBodyAfterBrace(source, pattern);
+  }
+
+  /// 開始パターンにマッチする `{` から対応する `}` までの本体を抽出
+  String? _extractBodyAfterBrace(String source, RegExp pattern) {
+    final match = pattern.firstMatch(source);
     if (match == null) return null;
 
     final startIndex = match.end;

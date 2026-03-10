@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.11.0] - 2026-03-11
+
+### Changed
+
+- `.custom.dart` のカスタムメソッドを生成されるリポジトリクラスに**インスタンスメソッドとして埋め込む**方式に変更
+  - extension メソッドは Dart の静的ディスパッチにより、テストでサブクラスから override できない問題を解決
+  - `.custom.dart` ファイル自体は extension 形式のまま保持（IDE サポート・編集用）
+  - suparepo 実行時に `.custom.dart` を読み取り、生成クラスに直接埋め込む
+  - use_case 側で `.custom.dart` の import が不要に
+  - テストの fake リポジトリでカスタムメソッドを正常に override 可能
+
 ## [1.10.1] - 2026-03-11
 
 ### Fixed

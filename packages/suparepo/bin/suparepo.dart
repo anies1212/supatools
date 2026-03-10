@@ -203,6 +203,7 @@ Future<int> _generateRepositories(
           customImports: result.customImports,
           supabaseImport: config.supabaseImport,
           modelImport: modelImport,
+          privateFields: result.privateFields,
         );
 
         await customFile.writeAsString(extensionCode);

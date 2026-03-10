@@ -16,9 +16,13 @@ class MigrationResult {
   final List<MethodInfo> customMethods;
   final List<String> customImports;
 
+  /// カスタムメソッドが参照するprivate field
+  final List<MethodInfo> privateFields;
+
   const MigrationResult({
     required this.customMethods,
     required this.customImports,
+    this.privateFields = const [],
   });
 
   bool get hasCustomCode => customMethods.isNotEmpty;
@@ -101,17 +105,42 @@ class CustomMethodMigrator {
 
     final members = _extractMembers(classBody);
     final customMethods = <MethodInfo>[];
+    final privateFields = <String, String>{}; // name → source
 
+    // Phase 1: メンバーを分類
     for (final member in members) {
       if (_isStandardMember(member, className)) continue;
+
+      // private static field の検出
+      final fieldName = _extractPrivateFieldName(member);
+      if (fieldName != null) {
+        privateFields[fieldName] = member;
+        continue;
+      }
+
       final name = _extractMemberName(member);
       if (name == null) continue;
       customMethods.add(MethodInfo(name: name, source: member));
     }
 
+    // Phase 2: カスタムメソッドが参照するprivate fieldを特定
+    final referencedFields = <MethodInfo>[];
+    for (final entry in privateFields.entries) {
+      final fieldName = entry.key;
+      final isReferenced = customMethods.any(
+        (m) => m.source.contains(fieldName),
+      );
+      if (isReferenced) {
+        referencedFields.add(
+          MethodInfo(name: fieldName, source: entry.value),
+        );
+      }
+    }
+
     return MigrationResult(
       customMethods: customMethods,
       customImports: customImports,
+      privateFields: referencedFields,
     );
   }
 
@@ -123,6 +152,7 @@ class CustomMethodMigrator {
     required List<String> customImports,
     required String supabaseImport,
     String? modelImport,
+    List<MethodInfo> privateFields = const [],
   }) {
     final buffer = StringBuffer();
 
@@ -149,6 +179,13 @@ class CustomMethodMigrator {
     buffer.writeln();
 
     buffer.writeln('extension ${className}Custom on $className {');
+
+    // private fieldsをstatic定数として出力
+    for (final field in privateFields) {
+      buffer.write(field.source);
+      buffer.writeln();
+      buffer.writeln();
+    }
 
     for (var i = 0; i < methods.length; i++) {
       final migrated = _migrateMethodSource(methods[i].source);
@@ -442,11 +479,9 @@ class CustomMethodMigrator {
 
       i++;
 
-      // アロー関数（=> ... ;）の場合
+      // 本体波括弧なしでセミコロン終了（フィールド宣言、アロー関数等）
       final trimmed = line.trim();
-      if (!foundBodyBrace &&
-          trimmed.contains('=>') &&
-          trimmed.endsWith(';')) {
+      if (!foundBodyBrace && trimmed.endsWith(';')) {
         break;
       }
 
@@ -611,6 +646,19 @@ class CustomMethodMigrator {
       return trimmed;
     }
     return '';
+  }
+
+  /// private fieldの名前を抽出（`_`で始まるフィールド宣言）
+  static final _privateFieldPattern = RegExp(
+    r'(?:static\s+)?(?:const\s+|final\s+|late\s+)'
+    r'(?:\w+(?:<[^>]*>)?\s+)?(_\w+)\s*[=;]',
+  );
+
+  /// メンバーソースからprivate field名を抽出
+  String? _extractPrivateFieldName(String memberSource) {
+    final signatureLine = _getSignatureLine(memberSource);
+    final match = _privateFieldPattern.firstMatch(signatureLine);
+    return match?.group(1);
   }
 
   /// メンバーソースからメソッド/getter名を抽出

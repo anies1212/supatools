@@ -557,6 +557,135 @@ extension UsersRepositoryCustom on UsersRepository {
     });
   });
 
+  group('private field移行', () {
+    test('カスタムメソッドが参照するprivate fieldが抽出される', () {
+      const source = '''
+class TestRepo {
+  final SupabaseClient _client;
+
+  TestRepo(this._client);
+
+  String get tableName => 'test';
+
+  SupabaseClient get client => _client;
+
+  Future<List<Map<String, dynamic>>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response;
+  }
+
+  static const _joinSelect = 'id, name, products(*)';
+
+  Future<List<Map<String, dynamic>>> getActive() async {
+    final response = await _client
+        .from(tableName)
+        .select(_joinSelect)
+        .eq('is_active', true);
+    return response;
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(source, 'TestRepo');
+      expect(result.customMethods, hasLength(1));
+      expect(result.customMethods.first.name, 'getActive');
+      expect(result.privateFields, hasLength(1));
+      expect(result.privateFields.first.name, '_joinSelect');
+    });
+
+    test('参照されないprivate fieldは移行しない', () {
+      const source = '''
+class TestRepo {
+  final SupabaseClient _client;
+
+  TestRepo(this._client);
+
+  String get tableName => 'test';
+
+  SupabaseClient get client => _client;
+
+  Future<List<Map<String, dynamic>>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response;
+  }
+
+  static const _unusedField = 'unused';
+
+  Future<List<Map<String, dynamic>>> getActive() async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('is_active', true);
+    return response;
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(source, 'TestRepo');
+      expect(result.customMethods, hasLength(1));
+      expect(result.privateFields, isEmpty);
+    });
+
+    test('private fieldがextensionに含まれる', () {
+      final code = migrator.generateExtensionFile(
+        className: 'TestRepo',
+        repositoryFileName: 'test_repository.dart',
+        methods: [
+          const MethodInfo(
+            name: 'getActive',
+            source: '  Future<void> getActive() async {}',
+          ),
+        ],
+        customImports: [],
+        supabaseImport: 'package:supabase_flutter/supabase_flutter.dart',
+        privateFields: [
+          const MethodInfo(
+            name: '_joinSelect',
+            source: "  static const _joinSelect = 'id, name';",
+          ),
+        ],
+      );
+
+      expect(code, contains("static const _joinSelect = 'id, name'"));
+      expect(code, contains('getActive'));
+    });
+
+    test('複数行のstatic const fieldが正しく抽出される', () {
+      const source = '''
+class TestRepo {
+  final SupabaseClient _client;
+
+  TestRepo(this._client);
+
+  String get tableName => 'test';
+
+  SupabaseClient get client => _client;
+
+  Future<List<Map<String, dynamic>>> getAll() async {
+    return await _client.from(tableName).select();
+  }
+
+  static const _selectQuery =
+      'id, name, description, products(image_url, name)';
+
+  Future<List<Map<String, dynamic>>> custom() async {
+    return await _client.from(tableName).select(_selectQuery);
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(source, 'TestRepo');
+      expect(result.customMethods, hasLength(1));
+      expect(result.customMethods.first.name, 'custom');
+      expect(result.privateFields, hasLength(1));
+      expect(result.privateFields.first.name, '_selectQuery');
+      expect(
+        result.privateFields.first.source,
+        contains('products(image_url, name)'),
+      );
+    });
+  });
+
   group('_client → client 置換', () {
     test('メソッド内の_clientがclientに置換される', () {
       final methods = [

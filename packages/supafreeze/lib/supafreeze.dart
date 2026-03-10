@@ -48,6 +48,7 @@ export 'package:supabase_schema_core/supabase_schema_core.dart'
         TableInfo,
         ColumnInfo,
         ForeignKeyInfo,
+        EnumInfo,
         SchemaFetchException,
         TypeMapper,
         FetchMode,
@@ -57,5 +58,6 @@ export 'package:supabase_schema_core/supabase_schema_core.dart'
 // Supafreeze-specific exports
 export 'src/config_loader.dart'
     show ConfigLoader, SupafreezeConfig, RelationConfig, RelationOverride;
+export 'src/enum_generator.dart' show EnumGenerator;
 export 'src/freezed_generator.dart' show FreezedGenerator;
 export 'src/schema_cache.dart' show SchemaCache, SchemaDiff;

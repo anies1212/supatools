@@ -1,6 +1,7 @@
 import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'config_loader.dart';
+import 'enum_generator.dart';
 
 /// Dart reserved words that cannot be used as identifiers
 /// https://dart.dev/language/keywords
@@ -47,6 +48,10 @@ class FreezedGenerator {
     _config = config;
   }
 
+  /// Enum import prefix relative to model output directory.
+  /// Set by the builder/CLI when enum generation is enabled.
+  String? enumImportPrefix;
+
   /// Gets the class name for a table
   String getClassName(String tableName) {
     final rawClassName = ReCase(tableName).pascalCase;
@@ -74,6 +79,12 @@ class FreezedGenerator {
     // Imports
     buffer.writeln(
         "import 'package:freezed_annotation/freezed_annotation.dart';");
+
+    // Add imports for enum types
+    final enumImports = _getEnumImports(table);
+    for (final import in enumImports) {
+      buffer.writeln("import '$import';");
+    }
 
     // Add imports for related models
     final relatedImports = _getRelatedImports(table);
@@ -115,6 +126,25 @@ class FreezedGenerator {
     buffer.writeln('}');
 
     return buffer.toString();
+  }
+
+  /// Gets imports needed for enum types used in the table
+  Set<String> _getEnumImports(TableInfo table) {
+    final imports = <String>{};
+    if (!TypeMapper.useEnumTypes) return imports;
+
+    final enumGen = EnumGenerator();
+    for (final column in table.columns) {
+      final baseType = column.dataType.endsWith('[]')
+          ? column.dataType.substring(0, column.dataType.length - 2)
+          : column.dataType;
+      if (TypeMapper.isCustomEnum(baseType)) {
+        final fileName = enumGen.getEnumFileName(baseType);
+        final prefix = enumImportPrefix ?? 'enums/';
+        imports.add('$prefix$fileName');
+      }
+    }
+    return imports;
   }
 
   /// Gets imports needed for related models

@@ -7,3 +7,6 @@ library;
 export 'src/schema_fetcher.dart';
 export 'src/type_mapper.dart';
 export 'src/config_loader.dart';
+
+// Re-export key types for convenience
+// EnumInfo is exported from schema_fetcher.dart

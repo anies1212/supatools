@@ -36,6 +36,8 @@ class ConfigLoader extends BaseConfigLoader {
       generateBarrel: yaml['generate_barrel'] == true,
       embedRelations: yaml['embed_relations'] == true,
       relations: _parseRelationsConfig(yaml['relations']),
+      generateEnums: yaml['generate_enums'] == true,
+      enumOutput: yaml['enum_output']?.toString(),
     );
   }
 
@@ -131,6 +133,13 @@ class SupafreezeConfig extends BaseSupabaseConfig {
   /// Per-table relation configuration overrides
   final Map<String, RelationConfig>? relations;
 
+  /// Whether to generate Dart enum types from PostgreSQL enums
+  final bool generateEnums;
+
+  /// Output directory for generated enum files.
+  /// Defaults to `{output}/enums`.
+  final String? enumOutput;
+
   const SupafreezeConfig({
     super.url,
     super.secretKey,
@@ -142,7 +151,12 @@ class SupafreezeConfig extends BaseSupabaseConfig {
     this.generateBarrel = false,
     this.embedRelations = false,
     this.relations,
+    this.generateEnums = false,
+    this.enumOutput,
   });
+
+  /// Gets the resolved enum output directory
+  String get resolvedEnumOutput => enumOutput ?? '$output/enums';
 
   /// Gets the relation config for a specific table
   RelationConfig? getRelationConfig(String tableName) => relations?[tableName];

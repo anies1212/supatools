@@ -5,6 +5,10 @@ class TypeMapper {
   /// Key: enum type name, Value: list of enum values
   static final Map<String, List<String>> _customEnums = {};
 
+  /// When true, [mapType] returns Dart enum type names (PascalCase)
+  /// instead of `String` for registered enum types.
+  static bool useEnumTypes = false;
+
   /// Registers a custom PostgreSQL enum type
   static void registerEnum(String enumName, List<String> values) {
     _customEnums[enumName.toLowerCase()] = values;
@@ -13,6 +17,7 @@ class TypeMapper {
   /// Clears all registered custom enums
   static void clearEnums() {
     _customEnums.clear();
+    useEnumTypes = false;
   }
 
   /// Checks if a type is a registered custom enum
@@ -25,6 +30,23 @@ class TypeMapper {
     return _customEnums[pgType.toLowerCase()];
   }
 
+  /// Converts a PostgreSQL enum type name to a Dart enum type name.
+  ///
+  /// e.g. `campaign_type` → `CampaignType`
+  static String enumTypeName(String pgType) {
+    final base =
+        pgType.endsWith('[]') ? pgType.substring(0, pgType.length - 2) : pgType;
+    return _toPascalCase(base);
+  }
+
+  static String _toPascalCase(String input) {
+    return input
+        .split(RegExp(r'[_\-\s]+'))
+        .where((s) => s.isNotEmpty)
+        .map((s) => s[0].toUpperCase() + s.substring(1).toLowerCase())
+        .join();
+  }
+
   /// Maps a PostgreSQL data type to a Dart type
   static String mapType(String pgType) {
     // Remove array suffix if present
@@ -33,7 +55,10 @@ class TypeMapper {
 
     // Check for custom enum first
     if (isCustomEnum(baseType)) {
-      // Custom enums are stored as strings in JSON, user can create Dart enums separately
+      if (useEnumTypes) {
+        final dartName = enumTypeName(baseType);
+        return isArray ? 'List<$dartName>' : dartName;
+      }
       return isArray ? 'List<String>' : 'String';
     }
 

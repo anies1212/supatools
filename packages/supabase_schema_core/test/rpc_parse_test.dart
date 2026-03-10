@@ -534,8 +534,7 @@ void main() {
           returnType: 'void',
         ),
       ];
-      final tableColumnsMap =
-          <String, List<RpcTableColumn>>{};
+      final tableColumnsMap = <String, List<RpcTableColumn>>{};
 
       final result = SchemaFetcher.mergeTableColumns(
         functions,

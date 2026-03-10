@@ -141,6 +141,86 @@ void main() {
       });
     });
 
+    group('enum type fields', () {
+      setUp(() {
+        TypeMapper.clearEnums();
+      });
+
+      test('generates enum type field when useEnumTypes is true', () {
+        TypeMapper.registerEnum('campaign_type', ['normal', 'trial']);
+        TypeMapper.useEnumTypes = true;
+
+        final table = TableInfo(
+          name: 'campaigns',
+          columns: [
+            ColumnInfo(
+              name: 'id',
+              dataType: 'uuid',
+              isNullable: false,
+            ),
+            ColumnInfo(
+              name: 'type',
+              dataType: 'campaign_type',
+              isNullable: false,
+            ),
+          ],
+        );
+
+        final gen = FreezedGenerator();
+        gen.enumImportPrefix = 'enums/';
+        final result = gen.generateModel(table);
+
+        expect(result, contains('required CampaignType type'));
+        expect(
+          result,
+          contains("import 'enums/campaign_type.supafreeze.dart'"),
+        );
+      });
+
+      test('generates String field when useEnumTypes is false', () {
+        TypeMapper.registerEnum('campaign_type', ['normal', 'trial']);
+        TypeMapper.useEnumTypes = false;
+
+        final table = TableInfo(
+          name: 'campaigns',
+          columns: [
+            ColumnInfo(
+              name: 'type',
+              dataType: 'campaign_type',
+              isNullable: false,
+            ),
+          ],
+        );
+
+        final result = generator.generateModel(table);
+
+        expect(result, contains('required String type'));
+        expect(result, isNot(contains("import 'enums/")));
+      });
+
+      test('generates nullable enum type field', () {
+        TypeMapper.registerEnum('order_status', ['pending', 'shipped']);
+        TypeMapper.useEnumTypes = true;
+
+        final table = TableInfo(
+          name: 'orders',
+          columns: [
+            ColumnInfo(
+              name: 'status',
+              dataType: 'order_status',
+              isNullable: true,
+            ),
+          ],
+        );
+
+        final gen = FreezedGenerator();
+        gen.enumImportPrefix = 'enums/';
+        final result = gen.generateModel(table);
+
+        expect(result, contains('OrderStatus? status'));
+      });
+    });
+
     group('getFileName', () {
       test('returns correct file name for table', () {
         expect(generator.getFileName('users'), 'users.supafreeze.dart');

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'type_mapper.dart';
 
 /// Represents a foreign key relationship
 class ForeignKeyInfo {
@@ -156,6 +157,20 @@ class RpcFunctionInfo {
   @override
   String toString() => 'RpcFunctionInfo($name, params: $params, '
       'returns: ${returnsSetOf ? 'setof ' : ''}$returnType)';
+}
+
+/// Represents a PostgreSQL enum type
+class EnumInfo {
+  /// The PostgreSQL type name (e.g. 'campaign_type')
+  final String name;
+
+  /// The enum values in sort order
+  final List<String> values;
+
+  const EnumInfo({required this.name, required this.values});
+
+  @override
+  String toString() => 'EnumInfo($name: $values)';
 }
 
 /// Fetches schema information from Supabase
@@ -415,8 +430,7 @@ class SchemaFetcher {
 
   /// Fetches TABLE column info from `pg_proc` catalog for
   /// functions that use `RETURNS TABLE(...)`.
-  Future<Map<String, List<RpcTableColumn>>>
-      _fetchRpcTableColumns() async {
+  Future<Map<String, List<RpcTableColumn>>> _fetchRpcTableColumns() async {
     final query = '''
       SELECT json_agg(sub) FROM (
         SELECT
@@ -442,12 +456,9 @@ class SchemaFetcher {
     final rows = response is List ? response : <dynamic>[];
     for (final row in rows) {
       final funcName = row['function_name'] as String;
-      final argModes =
-          (row['arg_modes'] as List).cast<String>();
-      final argNames =
-          (row['arg_names'] as List).cast<String>();
-      final argTypeNames =
-          (row['arg_type_names'] as List).cast<String>();
+      final argModes = (row['arg_modes'] as List).cast<String>();
+      final argNames = (row['arg_names'] as List).cast<String>();
+      final argTypeNames = (row['arg_type_names'] as List).cast<String>();
 
       final columns = <RpcTableColumn>[];
       for (var i = 0; i < argModes.length; i++) {
@@ -740,6 +751,86 @@ class SchemaFetcher {
   /// Gets the enums detected in the last schema fetch
   Map<String, List<String>> get detectedEnums =>
       Map.unmodifiable(_lastDetectedEnums);
+
+  /// Fetches PostgreSQL enum types from the `pg_enum` catalog.
+  ///
+  /// Requires `execute_sql` RPC function. Falls back to [detectedEnums]
+  /// (OpenAPI-based detection) when `execute_sql` is not available.
+  Future<List<EnumInfo>> fetchEnums() async {
+    try {
+      return await _fetchEnumsFromCatalog();
+    } catch (_) {
+      // Fallback: convert OpenAPI-detected enums
+      return detectedEnums.entries
+          .map((e) => EnumInfo(name: e.key, values: e.value))
+          .toList();
+    }
+  }
+
+  /// Queries `pg_enum` + `pg_type` + `pg_namespace` to get enum definitions.
+  Future<List<EnumInfo>> _fetchEnumsFromCatalog() async {
+    final query = '''
+      SELECT json_agg(sub) FROM (
+        SELECT
+          t.typname AS enum_name,
+          json_agg(e.enumlabel ORDER BY e.enumsortorder) AS enum_values
+        FROM pg_enum e
+        JOIN pg_type t ON e.enumtypid = t.oid
+        JOIN pg_namespace n ON t.typnamespace = n.oid
+        WHERE n.nspname = '$schema'
+        GROUP BY t.typname
+        ORDER BY t.typname
+      ) sub
+    ''';
+
+    final response = await _executeRawQuery(query);
+    final rows = response is List ? response : <dynamic>[];
+    return rows.map((row) {
+      final name = row['enum_name'] as String;
+      final values = (row['enum_values'] as List).cast<String>();
+      return EnumInfo(name: name, values: values);
+    }).toList();
+  }
+
+  /// Merges pg_enum type names into table column dataTypes.
+  ///
+  /// When OpenAPI detects enums as `tableName_columnName`, this method
+  /// replaces them with the actual PostgreSQL type name from pg_enum.
+  static List<TableInfo> mergeEnumTypes(
+    List<TableInfo> tables,
+    List<EnumInfo> pgEnums,
+  ) {
+    if (pgEnums.isEmpty) return tables;
+
+    // Build a reverse lookup: set of enum values -> pg type name
+    final enumLookup = <String, String>{};
+    for (final pgEnum in pgEnums) {
+      final key = pgEnum.values.join(',');
+      enumLookup[key] = pgEnum.name;
+    }
+
+    return tables.map((table) {
+      final newColumns = table.columns.map((col) {
+        final enumValues = TypeMapper.getEnumValues(col.dataType);
+        if (enumValues == null) return col;
+
+        final key = enumValues.join(',');
+        final pgName = enumLookup[key];
+        if (pgName == null) return col;
+
+        return ColumnInfo(
+          name: col.name,
+          dataType: pgName,
+          isNullable: col.isNullable,
+          defaultValue: col.defaultValue,
+          isPrimaryKey: col.isPrimaryKey,
+          foreignKey: col.foreignKey,
+        );
+      }).toList();
+
+      return table.copyWith(columns: newColumns);
+    }).toList();
+  }
 
   /// Converts OpenAPI type to PostgreSQL type
   String _openApiTypeToPgType(Map<String, dynamic> schema) {

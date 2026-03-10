@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.8.4] - 2026-03-11
+
+### Changed
+
+- Bumped `supabase_schema_core` dependency to `^1.4.0` (enum type support)
+
 ## [1.8.3] - 2026-03-05
 
 ### Fixed

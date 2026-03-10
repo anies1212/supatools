@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'config_loader.dart';
+import 'enum_generator.dart';
 import 'schema_cache.dart';
 import 'freezed_generator.dart';
 
@@ -147,7 +148,7 @@ class SupafreezeBuilder implements Builder {
     SupafreezeConfig config,
   ) async {
     try {
-      final fetchedTables = await fetcher.fetchTables();
+      var fetchedTables = await fetcher.fetchTables();
 
       // Register detected enums with TypeMapper
       final detectedEnums = fetcher.detectedEnums;
@@ -158,6 +159,44 @@ class SupafreezeBuilder implements Builder {
           log.fine('Detected enum: ${entry.key} = ${entry.value}');
         }
         log.info('Detected ${detectedEnums.length} enum type(s).');
+      }
+
+      // Fetch and generate PostgreSQL enums if enabled
+      if (config.generateEnums) {
+        final pgEnums = await fetcher.fetchEnums();
+        if (pgEnums.isNotEmpty) {
+          TypeMapper.clearEnums();
+          for (final pgEnum in pgEnums) {
+            TypeMapper.registerEnum(pgEnum.name, pgEnum.values);
+          }
+          TypeMapper.useEnumTypes = true;
+          fetchedTables = SchemaFetcher.mergeEnumTypes(fetchedTables, pgEnums);
+
+          // Generate enum files
+          final enumGen = EnumGenerator();
+          final enumDir = Directory(config.resolvedEnumOutput);
+          if (!await enumDir.exists()) {
+            await enumDir.create(recursive: true);
+          }
+          final enumFiles = enumGen.generateAllEnumFiles(pgEnums);
+          for (final entry in enumFiles.entries) {
+            final filePath = p.join(
+              config.resolvedEnumOutput,
+              entry.key,
+            );
+            await File(filePath).writeAsString(entry.value);
+            log.info('Generated enum: $filePath');
+          }
+          final barrelContent = enumGen.generateBarrelFile(pgEnums);
+          final barrelPath = p.join(
+            config.resolvedEnumOutput,
+            'enums.dart',
+          );
+          await File(barrelPath).writeAsString(barrelContent);
+          log.info(
+            'Found ${pgEnums.length} PostgreSQL enum(s).',
+          );
+        }
       }
 
       final filteredTables = fetchedTables
@@ -225,6 +264,11 @@ class SupafreezeBuilder implements Builder {
     // Configure generator with all tables and config for relation embedding
     generator.setAllTables(allTables);
     generator.setConfig(config);
+
+    // Set enum import prefix if enum generation is enabled
+    if (config.generateEnums && TypeMapper.useEnumTypes) {
+      generator.enumImportPrefix = 'enums/';
+    }
 
     // Log detected foreign keys if any
     if (config.embedRelations) {

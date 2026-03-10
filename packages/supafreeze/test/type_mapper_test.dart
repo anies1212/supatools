@@ -83,24 +83,43 @@ void main() {
             ['active', 'inactive', 'pending']);
       });
 
-      test('maps custom enum to String', () {
+      test('maps custom enum to String when useEnumTypes is false', () {
         TypeMapper.registerEnum('user_role', ['admin', 'user', 'guest']);
 
         expect(TypeMapper.mapType('user_role'), 'String');
       });
 
-      test('maps custom enum array to List<String>', () {
+      test('maps custom enum array to List<String> when useEnumTypes is false',
+          () {
         TypeMapper.registerEnum('tag', ['a', 'b', 'c']);
 
         expect(TypeMapper.mapType('tag[]'), 'List<String>');
       });
 
-      test('clears enums correctly', () {
+      test('maps custom enum to Dart type name when useEnumTypes is true', () {
+        TypeMapper.registerEnum('campaign_type', ['normal', 'trial']);
+        TypeMapper.useEnumTypes = true;
+
+        expect(TypeMapper.mapType('campaign_type'), 'CampaignType');
+      });
+
+      test('maps custom enum array to List<DartType> when useEnumTypes is true',
+          () {
+        TypeMapper.registerEnum('campaign_type', ['normal', 'trial']);
+        TypeMapper.useEnumTypes = true;
+
+        expect(TypeMapper.mapType('campaign_type[]'), 'List<CampaignType>');
+      });
+
+      test('clears enums and resets useEnumTypes', () {
         TypeMapper.registerEnum('status', ['a', 'b']);
+        TypeMapper.useEnumTypes = true;
         expect(TypeMapper.isCustomEnum('status'), isTrue);
+        expect(TypeMapper.useEnumTypes, isTrue);
 
         TypeMapper.clearEnums();
         expect(TypeMapper.isCustomEnum('status'), isFalse);
+        expect(TypeMapper.useEnumTypes, isFalse);
       });
 
       test('enum lookup is case-insensitive', () {
@@ -108,6 +127,20 @@ void main() {
 
         expect(TypeMapper.isCustomEnum('status'), isTrue);
         expect(TypeMapper.isCustomEnum('STATUS'), isTrue);
+      });
+    });
+
+    group('enumTypeName', () {
+      test('converts snake_case to PascalCase', () {
+        expect(TypeMapper.enumTypeName('campaign_type'), 'CampaignType');
+      });
+
+      test('handles single word', () {
+        expect(TypeMapper.enumTypeName('status'), 'Status');
+      });
+
+      test('handles array type suffix', () {
+        expect(TypeMapper.enumTypeName('campaign_type[]'), 'CampaignType');
       });
     });
 

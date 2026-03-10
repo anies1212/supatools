@@ -9,6 +9,7 @@ Generate [Freezed](https://pub.dev/packages/freezed) models from your Supabase d
 - **CLI tool** for syncing schema changes
 - **Smart caching** - only regenerates when DB schema changes
 - **Relation embedding** - auto-detects foreign keys and embeds related models
+- **Enum generation** - auto-generates Dart enum types from PostgreSQL enums via `pg_enum` catalog
 - **Flexible configuration** - supports `.env`, environment variables, and dart-define
 - Automatic PostgreSQL to Dart type mapping
 - Handles nullable fields, primary keys, and default values
@@ -408,6 +409,89 @@ class Users with _$Users {
   factory Users.fromJson(Map<String, dynamic> json) => _$UsersFromJson(json);
 }
 ```
+
+## PostgreSQL Enum Generation
+
+supafreeze can automatically generate Dart enum types from PostgreSQL enum types. This provides type-safe enum fields in your Freezed models instead of raw `String` values.
+
+### Prerequisites
+
+Requires the `execute_sql` RPC function in your Supabase project (see [suparepo README](https://pub.dev/packages/suparepo) for setup instructions). Without it, supafreeze falls back to OpenAPI spec detection, which may use `tableName_columnName` as enum type names instead of the actual PostgreSQL type name.
+
+### Configuration
+
+```yaml
+# supafreeze.yaml
+url: ${SUPABASE_DATA_API_URL}
+secret_key: ${SUPABASE_SECRET_KEY}
+output: lib/models
+generate_enums: true                    # Enable enum generation
+enum_output: lib/models/enums           # Optional (default: {output}/enums)
+```
+
+### Example
+
+For a PostgreSQL enum:
+
+```sql
+CREATE TYPE campaign_type AS ENUM ('normal', 'trial');
+
+CREATE TABLE campaigns (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type campaign_type NOT NULL
+);
+```
+
+supafreeze generates:
+
+**`lib/models/enums/campaign_type.supafreeze.dart`**
+```dart
+enum CampaignType {
+  normal('normal'),
+  trial('trial');
+
+  const CampaignType(this.value);
+  final String value;
+
+  String toJson() => value;
+  static CampaignType fromJson(String json) =>
+      values.firstWhere((e) => e.value == json);
+}
+```
+
+**`lib/models/campaigns.supafreeze.dart`**
+```dart
+import 'enums/campaign_type.supafreeze.dart';
+
+@freezed
+abstract class Campaigns with _$Campaigns {
+  const factory Campaigns({
+    required String id,
+    required CampaignType type,  // ← Dart enum, not String
+  }) = _Campaigns;
+
+  factory Campaigns.fromJson(Map<String, dynamic> json) =>
+      _$CampaignsFromJson(json);
+}
+```
+
+### Special enum values
+
+supafreeze handles special characters in enum values:
+
+| PostgreSQL value | Dart identifier |
+|---|---|
+| `in-progress` | `inProgress('in-progress')` |
+| `123abc` | `$123abc('123abc')` |
+| `class` (reserved word) | `class$('class')` |
+
+### Generated files
+
+When `generate_enums: true`:
+- Enum files: `{enum_output}/{enum_name}.supafreeze.dart`
+- Barrel file: `{enum_output}/enums.dart`
+
+A barrel file `enums.dart` is always generated for convenience.
 
 ## Type Mapping
 

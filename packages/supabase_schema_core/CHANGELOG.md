@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0] - 2026-03-11
+
+### Added
+
+- `EnumInfo` class for representing PostgreSQL enum types (name + values)
+- `SchemaFetcher.fetchEnums()` — queries `pg_enum` + `pg_type` + `pg_namespace` catalog to fetch PostgreSQL enum definitions; falls back to OpenAPI-detected enums when `execute_sql` is not available
+- `SchemaFetcher.mergeEnumTypes()` static method — replaces OpenAPI-derived enum type names (`tableName_columnName`) with actual PostgreSQL type names in table column definitions
+- `TypeMapper.useEnumTypes` static flag — when `true`, `mapType()` returns PascalCase Dart enum type names instead of `String` for registered enum types
+- `TypeMapper.enumTypeName()` — converts PostgreSQL enum type name to Dart enum type name (e.g. `campaign_type` → `CampaignType`)
+
 ## [1.3.0] - 2026-03-03
 
 ### Added

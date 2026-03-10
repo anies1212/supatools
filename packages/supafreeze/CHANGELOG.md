@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-11
+
+### Added
+
+- **PostgreSQL enum auto-generation** (`generate_enums`)
+  - Queries `pg_enum` catalog via `execute_sql` RPC to fetch enum type definitions
+  - Generates Dart enum files with `toJson()`/`fromJson()` for JSON serialization
+  - Freezed model fields use generated Dart enum types instead of `String`
+  - Configurable output directory via `enum_output` (default: `{output}/enums`)
+  - Falls back to OpenAPI spec detection when `execute_sql` is not available
+  - Handles special characters in enum values (hyphens, digits, reserved words)
+  - Generates barrel file `enums.dart` for convenient imports
+- `EnumGenerator` class for Dart enum code generation
+- `SupafreezeConfig.generateEnums` and `SupafreezeConfig.enumOutput` settings
+
+### Changed
+
+- Bumped `supabase_schema_core` dependency to `^1.4.0`
+
 ## [2.0.3] - 2026-02-18
 
 ### Fixed

@@ -107,6 +107,11 @@ class RepositoryGenerator {
 
     // Table name getter
     buffer.writeln("  String get tableName => '$tableName';");
+
+    // Public client getter for extensions
+    buffer.writeln();
+    buffer.writeln('  /// SupabaseClient accessor for custom extensions.');
+    buffer.writeln('  SupabaseClient get client => _client;');
     buffer.writeln();
 
     // getAll method

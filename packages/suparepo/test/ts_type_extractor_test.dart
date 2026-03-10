@@ -428,6 +428,121 @@ return new Response(
       });
     });
 
+    group('statusMapパターンのエラーコード抽出', () {
+      test('Record<string, number>のstatusMapからエラーコード検出', () {
+        const source = '''
+if (data.error) {
+  const statusMap: Record<string, number> = {
+    campaign_not_found: 404,
+    campaign_inactive: 400,
+    outside_time_window: 400,
+    already_participated: 409,
+    duplicate_receipt: 409,
+  };
+  const status = statusMap[data.error] ?? 500;
+  return new Response(
+    JSON.stringify({ error: data.error, message: data.message }),
+    { status, headers },
+  );
+}
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result, isNotNull);
+        expect(result!.errors, isNotNull);
+        expect(result.errors, hasLength(5));
+
+        final codes = result.errors!.map((e) => e.code).toSet();
+        expect(codes, contains('campaign_not_found'));
+        expect(codes, contains('campaign_inactive'));
+        expect(codes, contains('outside_time_window'));
+        expect(codes, contains('already_participated'));
+        expect(codes, contains('duplicate_receipt'));
+      });
+
+      test('statusMapのステータスコードが正しく紐付く', () {
+        const source = '''
+const statusMap: Record<string, number> = {
+  not_found_item: 404,
+  rate_limited: 429,
+};
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result!.errors, hasLength(2));
+
+        final notFound = result.errors!.firstWhere(
+          (e) => e.code == 'not_found_item',
+        );
+        expect(notFound.statusCode, 404);
+
+        final rateLimited = result.errors!.firstWhere(
+          (e) => e.code == 'rate_limited',
+        );
+        expect(rateLimited.statusCode, 429);
+      });
+
+      test('statusMapとリテラルエラーコードの混在', () {
+        const source = '''
+if (!name) {
+  return new Response(
+    JSON.stringify({ error: "missing_name", message: "required" }),
+    { status: 400, headers },
+  );
+}
+if (data.error) {
+  const statusMap: Record<string, number> = {
+    already_exists: 409,
+  };
+  const status = statusMap[data.error] ?? 500;
+  return new Response(
+    JSON.stringify({ error: data.error, message: data.message }),
+    { status, headers },
+  );
+}
+return new Response(
+  JSON.stringify({ result: "ok" }),
+  { status: 200, headers },
+);
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result!.errors, hasLength(2));
+
+        final codes = result.errors!.map((e) => e.code).toSet();
+        expect(codes, contains('missing_name'));
+        expect(codes, contains('already_exists'));
+      });
+
+      test('statusMapの重複エラーコードはリテラルと統合', () {
+        const source = '''
+return new Response(
+  JSON.stringify({ error: "duplicate_entry" }),
+  { status: 409, headers },
+);
+const statusMap: Record<string, number> = {
+  duplicate_entry: 409,
+  other_error: 400,
+};
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result!.errors, hasLength(2));
+
+        final codes = result.errors!.map((e) => e.code).toList();
+        expect(codes.where((c) => c == 'duplicate_entry'), hasLength(1));
+      });
+
+      test('statusMap内の非snake_caseキーはスキップ', () {
+        const source = '''
+const statusMap: Record<string, number> = {
+  valid_error: 400,
+  InvalidKey: 401,
+  another: 402,
+};
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result!.errors, hasLength(1));
+        expect(result.errors!.first.code, 'valid_error');
+      });
+    });
+
     group('エッジケース', () {
       test('body asパターンがない場合はnull', () {
         const source = 'console.log("hello");';

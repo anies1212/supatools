@@ -1,3 +1,4 @@
+import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'package:suparepo/src/edge_function_generator.dart';
 import 'package:suparepo/src/edge_function_info.dart';
 import 'package:suparepo/src/repository_generator.dart';
@@ -455,6 +456,32 @@ void main() {
         result['submit_receipt_error.dart'],
         contains('sealed class SubmitReceiptError'),
       );
+    });
+  });
+
+  group('RepositoryGenerator.generateRepository', () {
+    late RepositoryGenerator repoGenerator;
+
+    setUp(() {
+      repoGenerator = RepositoryGenerator();
+    });
+
+    test('client getterが生成される', () {
+      final table = TableInfo(
+        name: 'users',
+        columns: [
+          ColumnInfo(
+            name: 'id',
+            dataType: 'uuid',
+            isNullable: false,
+            isPrimaryKey: true,
+          ),
+        ],
+      );
+
+      final output = repoGenerator.generateRepository(table);
+
+      expect(output, contains('SupabaseClient get client => _client;'));
     });
   });
 

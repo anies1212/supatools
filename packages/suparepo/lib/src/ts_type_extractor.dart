@@ -154,10 +154,12 @@ class TsTypeExtractor {
   }
 
   /// Extracts error codes from error responses (4xx/5xx)
+  /// and statusMap / `Record<string, number>` patterns.
   List<EdgeFunctionErrorDef>? _extractErrorCodes(String source) {
     final errors = <EdgeFunctionErrorDef>[];
     final seen = <String>{};
 
+    // Pattern 1: Literal error codes in new Response(JSON.stringify({ error: "..." }))
     for (final match in _newResponsePattern.allMatches(source)) {
       final block = match.group(0)!;
 
@@ -191,7 +193,40 @@ class TsTypeExtractor {
       ));
     }
 
+    // Pattern 2: statusMap / Record<string, number> = { key: statusCode }
+    _extractStatusMapErrorCodes(source, errors, seen);
+
     return errors.isEmpty ? null : errors;
+  }
+
+  /// Extracts error codes from statusMap patterns like:
+  /// ```
+  /// const statusMap: Record<string, number> = {
+  ///   campaign_not_found: 404,
+  ///   campaign_inactive: 400,
+  /// };
+  /// ```
+  void _extractStatusMapErrorCodes(
+    String source,
+    List<EdgeFunctionErrorDef> errors,
+    Set<String> seen,
+  ) {
+    for (final match in _statusMapPattern.allMatches(source)) {
+      final body = match.group(1)!;
+      for (final entry in _statusMapEntryPattern.allMatches(body)) {
+        final code = entry.group(1)!;
+        final statusCode = int.tryParse(entry.group(2)!);
+
+        if (!_snakeCasePattern.hasMatch(code)) continue;
+        if (seen.contains(code)) continue;
+
+        seen.add(code);
+        errors.add(EdgeFunctionErrorDef(
+          code: code,
+          statusCode: statusCode,
+        ));
+      }
+    }
   }
 
   /// Removes comments as a preprocessing step
@@ -257,6 +292,17 @@ class TsTypeExtractor {
   /// snake_case pattern (at least one underscore, lowercase + digits)
   static final _snakeCasePattern = RegExp(
     r'^[a-z][a-z0-9]*(_[a-z0-9]+)+$',
+  );
+
+  /// `Record<string, number>` or `{ key: number }` status map pattern
+  static final _statusMapPattern = RegExp(
+    r'(?:Record<string,\s*number>|:\s*\{[^}]*\})\s*=\s*\{([^}]+)\}',
+    dotAll: true,
+  );
+
+  /// Entry pattern inside statusMap: key: number
+  static final _statusMapEntryPattern = RegExp(
+    r'(\w+)\s*:\s*(\d+)',
   );
 }
 

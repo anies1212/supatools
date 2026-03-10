@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.9.0] - 2026-03-11
+
+### Added
+
+- リポジトリクラスに `client` getter を追加（extension でカスタムメソッドを追加可能に）
+  - 再生成時にカスタムコードが消える問題を解消
+  - カスタムメソッドは `*_repository.custom.dart` に extension として記述
+
+### Fixed
+
+- TS型抽出器が `statusMap: Record<string, number>` パターンからエラーコードを検出できないバグを修正
+  - `error: data.error` のような変数参照＋statusMap経由のエラーコードに対応
+  - 既存のリテラル `error: "..."` パターンとマージして重複排除
+
 ## [1.8.4] - 2026-03-11
 
 ### Changed

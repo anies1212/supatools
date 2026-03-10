@@ -80,6 +80,9 @@ void main(List<String> args) async {
       if (config.generateEnums) {
         pgEnums = await fetcher.fetchEnums();
         if (pgEnums.isNotEmpty) {
+          // Save OpenAPI enums before clearing
+          final openApiEnums = Map<String, List<String>>.from(detectedEnums);
+
           // Re-register with pg_enum names
           TypeMapper.clearEnums();
           for (final pgEnum in pgEnums) {
@@ -88,7 +91,11 @@ void main(List<String> args) async {
           TypeMapper.useEnumTypes = true;
 
           // Merge enum type names into table columns
-          tables = SchemaFetcher.mergeEnumTypes(tables, pgEnums);
+          tables = SchemaFetcher.mergeEnumTypes(
+            tables,
+            pgEnums,
+            openApiEnums: openApiEnums,
+          );
 
           print(
             '🔖 Found ${pgEnums.length} PostgreSQL enum(s): '

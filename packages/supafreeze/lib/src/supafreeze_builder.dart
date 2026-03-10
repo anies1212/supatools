@@ -165,12 +165,19 @@ class SupafreezeBuilder implements Builder {
       if (config.generateEnums) {
         final pgEnums = await fetcher.fetchEnums();
         if (pgEnums.isNotEmpty) {
+          // Save OpenAPI enums before clearing
+          final openApiEnums = Map<String, List<String>>.from(detectedEnums);
+
           TypeMapper.clearEnums();
           for (final pgEnum in pgEnums) {
             TypeMapper.registerEnum(pgEnum.name, pgEnum.values);
           }
           TypeMapper.useEnumTypes = true;
-          fetchedTables = SchemaFetcher.mergeEnumTypes(fetchedTables, pgEnums);
+          fetchedTables = SchemaFetcher.mergeEnumTypes(
+            fetchedTables,
+            pgEnums,
+            openApiEnums: openApiEnums,
+          );
 
           // Generate enum files
           final enumGen = EnumGenerator();

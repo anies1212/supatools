@@ -796,10 +796,15 @@ class SchemaFetcher {
   ///
   /// When OpenAPI detects enums as `tableName_columnName`, this method
   /// replaces them with the actual PostgreSQL type name from pg_enum.
+  ///
+  /// [openApiEnums] is the OpenAPI-detected enum map (key: tableName_columnName,
+  /// value: enum values). This is needed because TypeMapper may have been
+  /// cleared and re-registered with pg_enum names by the time this is called.
   static List<TableInfo> mergeEnumTypes(
     List<TableInfo> tables,
-    List<EnumInfo> pgEnums,
-  ) {
+    List<EnumInfo> pgEnums, {
+    Map<String, List<String>> openApiEnums = const {},
+  }) {
     if (pgEnums.isEmpty) return tables;
 
     // Build a reverse lookup: set of enum values -> pg type name
@@ -811,7 +816,10 @@ class SchemaFetcher {
 
     return tables.map((table) {
       final newColumns = table.columns.map((col) {
-        final enumValues = TypeMapper.getEnumValues(col.dataType);
+        // Try OpenAPI enums first (key is tableName_columnName),
+        // then fall back to TypeMapper (may have been re-registered)
+        final enumValues = openApiEnums[col.dataType] ??
+            TypeMapper.getEnumValues(col.dataType);
         if (enumValues == null) return col;
 
         final key = enumValues.join(',');

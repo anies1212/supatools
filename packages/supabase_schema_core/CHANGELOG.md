@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1] - 2026-03-11
+
+### Fixed
+
+- `mergeEnumTypes`でOpenAPI由来のenum名（`tableName_columnName`形式）がpg_enum名にマッチせず`dynamic`になるバグを修正
+  - `openApiEnums`パラメータを追加し、TypeMapperクリア前のOpenAPI enum情報を参照可能に
+
 ## [1.4.0] - 2026-03-11
 
 ### Added

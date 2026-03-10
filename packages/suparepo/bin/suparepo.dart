@@ -3,6 +3,8 @@
 import 'dart:io';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'package:suparepo/src/config_loader.dart';
+import 'package:recase/recase.dart';
+import 'package:suparepo/src/custom_method_migrator.dart';
 import 'package:suparepo/src/repository_generator.dart';
 import 'package:suparepo/src/rpc_generator.dart';
 import 'package:suparepo/src/rpc_result_model_generator.dart';
@@ -20,8 +22,10 @@ import 'package:path/path.dart' as p;
 ///   dart run suparepo --rpc        # RPC client only
 ///   dart run suparepo --edge       # Edge Function client only
 ///   dart run suparepo --force      # Force regenerate all
+///   dart run suparepo --no-migrate # Skip custom method migration
 void main(List<String> args) async {
   final force = args.contains('--force') || args.contains('-f');
+  final noMigrate = args.contains('--no-migrate');
   final repoOnly = args.contains('--repo');
   final rpcOnly = args.contains('--rpc');
   final edgeOnly = args.contains('--edge');
@@ -61,7 +65,11 @@ void main(List<String> args) async {
 
   // --- Table Repositories ---
   if (runRepo) {
-    totalGenerated += await _generateRepositories(config, force);
+    totalGenerated += await _generateRepositories(
+      config,
+      force,
+      migrate: !noMigrate,
+    );
   }
 
   // --- RPC Client ---
@@ -94,8 +102,9 @@ void main(List<String> args) async {
 
 Future<int> _generateRepositories(
   SuparepoConfig config,
-  bool force,
-) async {
+  bool force, {
+  bool migrate = true,
+}) async {
   final fetcher = SchemaFetcher(
     supabaseUrl: config.url!,
     supabaseKey: config.secretKey!,
@@ -126,9 +135,87 @@ Future<int> _generateRepositories(
 
   final generator = RepositoryGenerator();
   generator.setConfig(config);
-
-  final files = generator.generateAllRepositories(filtered);
   final outputDir = config.output;
+
+  var generatedCount = 0;
+
+  // カスタムメソッド移行: 上書き前に既存ファイルを検査
+  if (migrate) {
+    final migrator = CustomMethodMigrator();
+
+    for (final table in filtered) {
+      final repoFileName = generator.getFileName(table.name);
+      final repoFilePath = p.join(outputDir, repoFileName);
+      final existingFile = File(repoFilePath);
+
+      if (!await existingFile.exists()) continue;
+
+      final existingCode = await existingFile.readAsString();
+      final className = generator.getRepositoryClassName(table.name);
+      final result = migrator.extractCustomMethods(
+        existingCode,
+        className,
+      );
+
+      if (!result.hasCustomCode) continue;
+
+      final customFileName = migrator.getCustomFileName(table.name);
+      final customFilePath = p.join(outputDir, customFileName);
+      final customFile = File(customFilePath);
+
+      // モデルimportの解決
+      String? modelImport;
+      if (config.modelImportPrefix != null) {
+        final modelFile =
+            '${ReCase(table.name).snakeCase}.supafreeze.dart';
+        modelImport = '${config.modelImportPrefix}$modelFile';
+      } else if (config.modelImportPath != null) {
+        modelImport = config.modelImportPath;
+      }
+
+      if (await customFile.exists()) {
+        // 既存extensionファイルとマージ
+        final existingCustomCode = await customFile.readAsString();
+        final mergeResult = migrator.mergeWithExisting(
+          existingCustomCode,
+          result.customMethods,
+        );
+
+        if (mergeResult.added.isNotEmpty) {
+          await customFile.writeAsString(mergeResult.mergedCode);
+          for (final name in mergeResult.added) {
+            print('🔀 Migrated: $name → $customFileName');
+          }
+          generatedCount++;
+        }
+        for (final name in mergeResult.skipped) {
+          print(
+            '⚠️  Skipped: $name '
+            '(already in $customFileName)',
+          );
+        }
+      } else {
+        // 新規extensionファイル生成
+        final extensionCode = migrator.generateExtensionFile(
+          className: className,
+          repositoryFileName: repoFileName,
+          methods: result.customMethods,
+          customImports: result.customImports,
+          supabaseImport: config.supabaseImport,
+          modelImport: modelImport,
+        );
+
+        await customFile.writeAsString(extensionCode);
+        for (final method in result.customMethods) {
+          print('🔀 Migrated: ${method.name} → $customFileName');
+        }
+        generatedCount++;
+      }
+    }
+  }
+
+  // リポジトリ生成（上書き）
+  final files = generator.generateAllRepositories(filtered);
 
   for (final entry in files.entries) {
     final filePath = p.join(outputDir, entry.key);
@@ -136,7 +223,7 @@ Future<int> _generateRepositories(
     print('✨ Generated: $filePath');
   }
 
-  return files.length;
+  return files.length + generatedCount;
 }
 
 Future<int> _generateRpcClient(SuparepoConfig config) async {

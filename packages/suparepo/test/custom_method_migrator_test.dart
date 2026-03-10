@@ -1,0 +1,584 @@
+import 'package:test/test.dart';
+import 'package:suparepo/src/custom_method_migrator.dart';
+
+void main() {
+  late CustomMethodMigrator migrator;
+
+  setUp(() {
+    migrator = CustomMethodMigrator();
+  });
+
+  group('getCustomFileName', () {
+    test('テーブル名からカスタムファイル名を生成', () {
+      expect(
+        migrator.getCustomFileName('user_profiles'),
+        'user_profiles_repository.custom.dart',
+      );
+    });
+  });
+
+  group('extractCustomMethods', () {
+    test('標準メソッドのみのファイル → 空リスト', () {
+      const source = '''
+class UsersRepository {
+  final SupabaseClient _client;
+
+  UsersRepository(this._client);
+
+  String get tableName => 'users';
+
+  SupabaseClient get client => _client;
+
+  Future<List<User>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+
+  Future<User?> getById(String id) async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    return response != null ? User.fromJson(response) : null;
+  }
+
+  Future<User> create(User data) async {
+    final response = await _client
+        .from(tableName)
+        .insert(data.toJson())
+        .select()
+        .single();
+    return User.fromJson(response);
+  }
+
+  Future<User> update(String id, User data) async {
+    final response = await _client
+        .from(tableName)
+        .update(data.toJson())
+        .eq('id', id)
+        .select()
+        .single();
+    return User.fromJson(response);
+  }
+
+  Future<void> delete(String id) async {
+    await _client
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+  }
+
+  Future<int> count() async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .count(CountOption.exact);
+    return response.count;
+  }
+
+  Future<List<User>> paginate({int page = 1, int perPage = 20}) async {
+    final from = (page - 1) * perPage;
+    final to = from + perPage - 1;
+    final response = await _client
+        .from(tableName)
+        .select()
+        .range(from, to);
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(source, 'UsersRepository');
+      expect(result.customMethods, isEmpty);
+    });
+
+    test('カスタムメソッド1つ → 正しく抽出', () {
+      const source = '''
+class UsersRepository {
+  final SupabaseClient _client;
+
+  UsersRepository(this._client);
+
+  String get tableName => 'users';
+
+  SupabaseClient get client => _client;
+
+  Future<List<User>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+
+  Future<User?> getById(String id) async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    return response != null ? User.fromJson(response) : null;
+  }
+
+  Future<User> create(User data) async {
+    final response = await _client
+        .from(tableName)
+        .insert(data.toJson())
+        .select()
+        .single();
+    return User.fromJson(response);
+  }
+
+  Future<User> update(String id, User data) async {
+    final response = await _client
+        .from(tableName)
+        .update(data.toJson())
+        .eq('id', id)
+        .select()
+        .single();
+    return User.fromJson(response);
+  }
+
+  Future<void> delete(String id) async {
+    await _client
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+  }
+
+  Future<int> count() async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .count(CountOption.exact);
+    return response.count;
+  }
+
+  Future<List<User>> paginate({int page = 1, int perPage = 20}) async {
+    final from = (page - 1) * perPage;
+    final to = from + perPage - 1;
+    final response = await _client
+        .from(tableName)
+        .select()
+        .range(from, to);
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+
+  /// アクティブなユーザーを取得
+  Future<List<User>> getActive() async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('is_active', true);
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(source, 'UsersRepository');
+      expect(result.customMethods, hasLength(1));
+      expect(result.customMethods.first.name, 'getActive');
+      expect(
+        result.customMethods.first.source,
+        contains('getActive'),
+      );
+      expect(
+        result.customMethods.first.source,
+        contains('アクティブなユーザーを取得'),
+      );
+    });
+
+    test('カスタムメソッド複数 → 全て抽出', () {
+      const source = '''
+class ProjectsRepository {
+  final SupabaseClient _client;
+
+  ProjectsRepository(this._client);
+
+  String get tableName => 'projects';
+
+  SupabaseClient get client => _client;
+
+  Future<List<Project>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response.map((e) => Project.fromJson(e)).toList();
+  }
+
+  Future<Project?> getById(String id) async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    return response != null ? Project.fromJson(response) : null;
+  }
+
+  Future<Project> create(Project data) async {
+    final response = await _client
+        .from(tableName)
+        .insert(data.toJson())
+        .select()
+        .single();
+    return Project.fromJson(response);
+  }
+
+  Future<Project> update(String id, Project data) async {
+    final response = await _client
+        .from(tableName)
+        .update(data.toJson())
+        .eq('id', id)
+        .select()
+        .single();
+    return Project.fromJson(response);
+  }
+
+  Future<void> delete(String id) async {
+    await _client.from(tableName).delete().eq('id', id);
+  }
+
+  Future<int> count() async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .count(CountOption.exact);
+    return response.count;
+  }
+
+  Future<List<Project>> paginate({int page = 1, int perPage = 20}) async {
+    final from = (page - 1) * perPage;
+    final to = from + perPage - 1;
+    final response = await _client
+        .from(tableName)
+        .select()
+        .range(from, to);
+    return response.map((e) => Project.fromJson(e)).toList();
+  }
+
+  Future<List<Project>> getActive() async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('is_active', true);
+    return response.map((e) => Project.fromJson(e)).toList();
+  }
+
+  Future<Project?> getByExternalId(String externalId) async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('external_id', externalId)
+        .maybeSingle();
+    return response != null ? Project.fromJson(response) : null;
+  }
+
+  Future<String> getParticipationUrl(String projectId) async {
+    final response = await _client
+        .from(tableName)
+        .select('participation_url')
+        .eq('id', projectId)
+        .single();
+    return response['participation_url'] as String;
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(
+        source,
+        'ProjectsRepository',
+      );
+      expect(result.customMethods, hasLength(3));
+      expect(
+        result.customMethods.map((m) => m.name).toList(),
+        ['getActive', 'getByExternalId', 'getParticipationUrl'],
+      );
+    });
+
+    test('getAllWith{Relation}は標準メソッドとして除外', () {
+      const source = '''
+class OrdersRepository {
+  final SupabaseClient _client;
+
+  OrdersRepository(this._client);
+
+  String get tableName => 'orders';
+
+  SupabaseClient get client => _client;
+
+  Future<List<Order>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response.map((e) => Order.fromJson(e)).toList();
+  }
+
+  Future<List<Order>> getAllWithUser() async {
+    final response = await _client
+        .from(tableName)
+        .select('*, user:users(*)');
+    return response.map((e) => Order.fromJson(e)).toList();
+  }
+
+  Future<List<Order>> getByStatus(String status) async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('status', status);
+    return response.map((e) => Order.fromJson(e)).toList();
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(
+        source,
+        'OrdersRepository',
+      );
+      expect(result.customMethods, hasLength(1));
+      expect(result.customMethods.first.name, 'getByStatus');
+    });
+
+    test('ネストした波括弧を含むメソッド → 正しい境界検出', () {
+      const source = '''
+class UsersRepository {
+  final SupabaseClient _client;
+
+  UsersRepository(this._client);
+
+  String get tableName => 'users';
+
+  SupabaseClient get client => _client;
+
+  Future<List<User>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+
+  Future<List<User>> searchByCondition(Map<String, dynamic> condition) async {
+    var query = _client.from(tableName).select();
+    for (final entry in condition.entries) {
+      if (entry.value != null) {
+        query = query.eq(entry.key, entry.value);
+      }
+    }
+    final response = await query;
+    return response.map((e) {
+      return User.fromJson(e);
+    }).toList();
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(
+        source,
+        'UsersRepository',
+      );
+      expect(result.customMethods, hasLength(1));
+      expect(result.customMethods.first.name, 'searchByCondition');
+      expect(
+        result.customMethods.first.source,
+        contains('for (final entry'),
+      );
+      expect(
+        result.customMethods.first.source,
+        contains('}).toList()'),
+      );
+    });
+
+    test('カスタムimportの検出', () {
+      const source = '''
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/user.supafreeze.dart';
+import 'package:some_package/some_package.dart';
+import '../utils/date_helper.dart';
+
+class UsersRepository {
+  final SupabaseClient _client;
+
+  UsersRepository(this._client);
+
+  String get tableName => 'users';
+
+  SupabaseClient get client => _client;
+
+  Future<List<User>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(
+        source,
+        'UsersRepository',
+      );
+      expect(result.customImports, hasLength(2));
+      expect(
+        result.customImports,
+        contains("import 'package:some_package/some_package.dart';"),
+      );
+      expect(
+        result.customImports,
+        contains("import '../utils/date_helper.dart';"),
+      );
+    });
+
+    test('文字列リテラル内の波括弧はスキップ', () {
+      const source = '''
+class UsersRepository {
+  final SupabaseClient _client;
+
+  UsersRepository(this._client);
+
+  String get tableName => 'users';
+
+  SupabaseClient get client => _client;
+
+  Future<List<User>> getAll() async {
+    final response = await _client.from(tableName).select();
+    return response.map((e) => User.fromJson(e)).toList();
+  }
+
+  Future<void> logAction(String userId) async {
+    final message = 'User {action} for id: \$userId';
+    print('Debug: \${message}');
+    await _client.from('logs').insert({'user_id': userId, 'message': message});
+  }
+}
+''';
+
+      final result = migrator.extractCustomMethods(
+        source,
+        'UsersRepository',
+      );
+      expect(result.customMethods, hasLength(1));
+      expect(result.customMethods.first.name, 'logAction');
+    });
+  });
+
+  group('generateExtensionFile', () {
+    test('正しいextensionファイルを生成', () {
+      final methods = [
+        const MethodInfo(
+          name: 'getActive',
+          source: '''  /// アクティブなユーザーを取得
+  Future<List<User>> getActive() async {
+    final response = await _client
+        .from(tableName)
+        .select()
+        .eq('is_active', true);
+    return response.map((e) => User.fromJson(e)).toList();
+  }''',
+        ),
+      ];
+
+      final code = migrator.generateExtensionFile(
+        className: 'UsersRepository',
+        repositoryFileName: 'users_repository.dart',
+        methods: methods,
+        customImports: [],
+        supabaseImport: 'package:supabase_flutter/supabase_flutter.dart',
+        modelImport: '../models/user.supafreeze.dart',
+      );
+
+      expect(code, contains('extension UsersRepositoryCustom on UsersRepository'));
+      expect(code, contains("import 'users_repository.dart';"));
+      expect(code, contains("import '../models/user.supafreeze.dart';"));
+      // _client → client 置換
+      expect(code, contains('await client'));
+      expect(code, isNot(contains('_client')));
+    });
+
+    test('カスタムimportが含まれる', () {
+      final code = migrator.generateExtensionFile(
+        className: 'UsersRepository',
+        repositoryFileName: 'users_repository.dart',
+        methods: [
+          const MethodInfo(
+            name: 'test',
+            source: '  Future<void> test() async {}',
+          ),
+        ],
+        customImports: [
+          "import 'package:some_package/some_package.dart';",
+        ],
+        supabaseImport: 'package:supabase_flutter/supabase_flutter.dart',
+      );
+
+      expect(
+        code,
+        contains("import 'package:some_package/some_package.dart';"),
+      );
+    });
+  });
+
+  group('mergeWithExisting', () {
+    test('重複メソッドはスキップ', () {
+      const existingCode = '''
+extension UsersRepositoryCustom on UsersRepository {
+  Future<List<User>> getActive() async {
+    // 既存の実装
+    return [];
+  }
+}
+''';
+
+      final newMethods = [
+        const MethodInfo(
+          name: 'getActive',
+          source: '  Future<List<User>> getActive() async { return []; }',
+        ),
+      ];
+
+      final result = migrator.mergeWithExisting(existingCode, newMethods);
+      expect(result.skipped, contains('getActive'));
+      expect(result.added, isEmpty);
+    });
+
+    test('新規メソッドは追加', () {
+      const existingCode = '''
+extension UsersRepositoryCustom on UsersRepository {
+  Future<List<User>> getActive() async {
+    return [];
+  }
+}
+''';
+
+      final newMethods = [
+        const MethodInfo(
+          name: 'getActive',
+          source: '  Future<List<User>> getActive() async { return []; }',
+        ),
+        const MethodInfo(
+          name: 'getInactive',
+          source:
+              '  Future<List<User>> getInactive() async {\n    return [];\n  }',
+        ),
+      ];
+
+      final result = migrator.mergeWithExisting(existingCode, newMethods);
+      expect(result.skipped, contains('getActive'));
+      expect(result.added, contains('getInactive'));
+      expect(result.mergedCode, contains('getInactive'));
+    });
+  });
+
+  group('_client → client 置換', () {
+    test('メソッド内の_clientがclientに置換される', () {
+      final methods = [
+        const MethodInfo(
+          name: 'test',
+          source:
+              '  Future<void> test() async {\n'
+              '    await _client.from(tableName).select();\n'
+              '  }',
+        ),
+      ];
+
+      final code = migrator.generateExtensionFile(
+        className: 'TestRepository',
+        repositoryFileName: 'test_repository.dart',
+        methods: methods,
+        customImports: [],
+        supabaseImport: 'package:supabase_flutter/supabase_flutter.dart',
+      );
+
+      expect(code, contains('await client.from'));
+      expect(code, isNot(contains('_client')));
+    });
+  });
+}

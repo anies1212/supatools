@@ -238,6 +238,14 @@ Future<int> _generateRepositories(
       customContents[table.name] = content;
       print('📎 Embedding custom methods: $customFileName');
     }
+
+    // .custom.dart の未使用importをクリーンアップ
+    final cleaned = embedMigrator.cleanupCustomFileImports(customCode);
+    if (cleaned != null) {
+      await customFile.writeAsString(cleaned);
+      print('🧹 Cleaned imports: $customFileName');
+      generatedCount++;
+    }
   }
 
   // リポジトリ生成（上書き）

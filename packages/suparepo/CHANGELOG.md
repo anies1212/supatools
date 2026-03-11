@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2] - 2026-03-11
+
+### Fixed
+
+- `.custom.dart` ファイルの未使用 import（supabase, supafreeze）を自動クリーンアップする機能を追加
+- `generateExtensionFile()` でメソッドが実際に参照する型のみ import するよう改善
+
 ## [1.11.1] - 2026-03-11
 
 ### Fixed

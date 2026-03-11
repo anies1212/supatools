@@ -179,8 +179,17 @@ class CustomMethodMigrator {
     );
     buffer.writeln();
 
-    buffer.writeln("import '$supabaseImport';");
-    if (modelImport != null) {
+    // メソッド本体で参照されているimportのみ出力
+    final allSources = [
+      ...methods.map((m) => m.source),
+      ...privateFields.map((f) => f.source),
+    ].join('\n');
+
+    if (_isImportReferenced(supabaseImport, allSources)) {
+      buffer.writeln("import '$supabaseImport';");
+    }
+    if (modelImport != null &&
+        _isImportReferenced(modelImport, allSources)) {
       buffer.writeln("import '$modelImport';");
     }
     for (final imp in customImports) {
@@ -728,6 +737,68 @@ class CustomMethodMigrator {
   /// メソッドソースの `_client` を `client` に置換
   String _migrateMethodSource(String source) {
     return source.replaceAll(RegExp(r'\b_client\b'), 'client');
+  }
+
+  /// importパスがソースコード内で参照されているか判定。
+  ///
+  /// import先のパッケージが export する型名を直接チェックするのは困難なため、
+  /// Dart の慣例（`SupabaseClient` 等の型名が `package:supabase` 由来）に基づき
+  /// ソースに型名が出現しない ≒ import不要 と判定する簡易ヒューリスティック。
+  bool _isImportReferenced(String importPath, String source) {
+    // supabase系: SupabaseClient, CountOption 等の型名が出現するか
+    if (importPath.contains('package:supabase')) {
+      return RegExp(r'\bSupabaseClient\b').hasMatch(source) ||
+          RegExp(r'\bCountOption\b').hasMatch(source);
+    }
+    // supafreeze model: ファイル名からクラス名を推定して出現チェック
+    if (importPath.contains('.supafreeze.dart')) {
+      final fileName = importPath.split('/').last;
+      final baseName = fileName.replaceAll('.supafreeze.dart', '');
+      // snake_case → PascalCase
+      final className = ReCase(baseName).pascalCase;
+      return source.contains(className);
+    }
+    // それ以外は常に必要とみなす
+    return true;
+  }
+
+  /// 既存の `.custom.dart` ファイルから未使用importを除去した
+  /// コードを返す。メソッド本体で参照されていないimportを削除する。
+  String? cleanupCustomFileImports(String customCode) {
+    final body = _extractExtensionBody(customCode);
+    if (body == null) return null;
+
+    final lines = customCode.split('\n');
+    final cleaned = <String>[];
+    var modified = false;
+
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.startsWith('import ')) {
+        // repositoryの自己importは常に保持
+        if (trimmed.contains('_repository.dart')) {
+          cleaned.add(line);
+          continue;
+        }
+        // import先がbodyで参照されているか判定
+        final pathMatch = RegExp(
+          r"import\s+'([^']+)'",
+        ).firstMatch(trimmed);
+        if (pathMatch != null) {
+          final importPath = pathMatch.group(1)!;
+          if (!_isImportReferenced(importPath, body)) {
+            modified = true;
+            continue; // 未使用import → 除去
+          }
+        }
+        cleaned.add(line);
+      } else {
+        cleaned.add(line);
+      }
+    }
+
+    if (!modified) return null;
+    return cleaned.join('\n');
   }
 
   /// 既存extensionファイルからメソッド名を抽出

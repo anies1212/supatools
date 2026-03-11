@@ -479,10 +479,53 @@ class UsersRepository {
 
       expect(code, contains('extension UsersRepositoryCustom on UsersRepository'));
       expect(code, contains("import 'users_repository.dart';"));
+      // User型を参照 → model importあり
       expect(code, contains("import '../models/user.supafreeze.dart';"));
+      // SupabaseClient型は直接参照なし → supabase importなし
+      expect(code, isNot(contains('supabase_flutter')));
       // _client → client 置換
       expect(code, contains('await client'));
       expect(code, isNot(contains('_client')));
+    });
+
+    test('SupabaseClient型を直接参照 → supabase importあり', () {
+      final methods = [
+        const MethodInfo(
+          name: 'getClient',
+          source:
+              '  SupabaseClient get rawClient => client;',
+        ),
+      ];
+
+      final code = migrator.generateExtensionFile(
+        className: 'UsersRepository',
+        repositoryFileName: 'users_repository.dart',
+        methods: methods,
+        customImports: [],
+        supabaseImport: 'package:supabase_flutter/supabase_flutter.dart',
+      );
+
+      expect(code, contains('supabase_flutter'));
+    });
+
+    test('model型を参照しない → model importなし', () {
+      final methods = [
+        const MethodInfo(
+          name: 'doSomething',
+          source: '  Future<void> doSomething() async {}',
+        ),
+      ];
+
+      final code = migrator.generateExtensionFile(
+        className: 'UsersRepository',
+        repositoryFileName: 'users_repository.dart',
+        methods: methods,
+        customImports: [],
+        supabaseImport: 'package:supabase_flutter/supabase_flutter.dart',
+        modelImport: '../models/user.supafreeze.dart',
+      );
+
+      expect(code, isNot(contains('supafreeze')));
     });
 
     test('カスタムimportが含まれる', () {
@@ -758,6 +801,48 @@ import 'test_repository.dart';
       );
 
       expect(result, isNull);
+    });
+  });
+
+  group('cleanupCustomFileImports', () {
+    test('未使用のsupabase/supafreeze importを除去', () {
+      const customCode = '''
+// ignore_for_file: type=lint
+
+import 'package:supabase/supabase.dart';
+import 'package:data/test.supafreeze.dart';
+import 'package:data/some_result.dart';
+import 'test_repository.dart';
+
+extension TestRepositoryCustom on TestRepository {
+  Future<List<SomeResult>> getActive() async {
+    return [];
+  }
+}
+''';
+
+      final cleaned = migrator.cleanupCustomFileImports(customCode);
+      expect(cleaned, isNotNull);
+      // supabase, supafreeze importが除去される
+      expect(cleaned, isNot(contains('package:supabase')));
+      expect(cleaned, isNot(contains('.supafreeze.dart')));
+      // 参照されているimportは保持
+      expect(cleaned, contains('some_result.dart'));
+      expect(cleaned, contains('test_repository.dart'));
+    });
+
+    test('全importが必要な場合 → null', () {
+      const customCode = '''
+import 'package:data/some_result.dart';
+import 'test_repository.dart';
+
+extension TestRepositoryCustom on TestRepository {
+  Future<SomeResult> get() async => SomeResult();
+}
+''';
+
+      final cleaned = migrator.cleanupCustomFileImports(customCode);
+      expect(cleaned, isNull);
     });
   });
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.3] - 2026-03-11
+
+### Fixed
+
+- `_isImportReferenced` で `.supafreeze.dart` のクラス名が `Repository`/`Custom` サフィックス付きの識別子に部分一致してしまうバグを修正
+  - 例: `TentameProjects` が `TentameProjectsRepository` に誤マッチし、未使用importが除去されなかった
+
 ## [1.11.2] - 2026-03-11
 
 ### Fixed

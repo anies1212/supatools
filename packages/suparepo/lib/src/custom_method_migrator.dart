@@ -756,7 +756,7 @@ class CustomMethodMigrator {
       final baseName = fileName.replaceAll('.supafreeze.dart', '');
       // snake_case → PascalCase
       final className = ReCase(baseName).pascalCase;
-      return source.contains(className);
+      return RegExp('\\b$className\\b(?!Repository|Custom)').hasMatch(source);
     }
     // それ以外は常に必要とみなす
     return true;

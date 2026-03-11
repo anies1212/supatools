@@ -831,6 +831,31 @@ extension TestRepositoryCustom on TestRepository {
       expect(cleaned, contains('test_repository.dart'));
     });
 
+    test('クラス名が部分一致するsupafreeze importを除去', () {
+      // tentame_projects.supafreeze.dart → TentameProjects だが
+      // TentameProjectsRepository に部分一致してはいけない
+      const customCode = '''
+// ignore_for_file: type=lint
+
+import 'package:data/tentame_projects.supafreeze.dart';
+import 'package:data/get_active_result.dart';
+import 'tentame_projects_repository.dart';
+
+extension TentameProjectsRepositoryCustom on TentameProjectsRepository {
+  Future<List<GetActiveResult>> getActive() async {
+    final response = await client.from(tableName).select();
+    return response.map(GetActiveResult.fromRow).toList();
+  }
+}
+''';
+
+      final cleaned = migrator.cleanupCustomFileImports(customCode);
+      expect(cleaned, isNotNull);
+      expect(cleaned, isNot(contains('.supafreeze.dart')));
+      expect(cleaned, contains('get_active_result.dart'));
+      expect(cleaned, contains('tentame_projects_repository.dart'));
+    });
+
     test('全importが必要な場合 → null', () {
       const customCode = '''
 import 'package:data/some_result.dart';

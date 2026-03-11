@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1] - 2026-03-11
+
+### Fixed
+
+- `.custom.dart` から埋め込み時に `.supafreeze.dart` import を除外漏れしていたバグを修正
+- 生成リポジトリファイルで custom import が既存 import と重複するバグを修正
+
 ## [1.11.0] - 2026-03-11
 
 ### Changed

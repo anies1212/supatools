@@ -696,6 +696,7 @@ class TestRepo {
 // ignore_for_file: type=lint
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:data/test.supafreeze.dart';
 import 'package:data/some_model.dart';
 import 'test_repository.dart';
 
@@ -719,7 +720,7 @@ extension TestRepositoryCustom on TestRepository {
       );
 
       expect(result, isNotNull);
-      // supabase importとself-importは除外
+      // supabase, supafreeze, self-importは除外
       expect(result!.imports, hasLength(1));
       expect(
         result.imports.first,

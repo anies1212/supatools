@@ -229,6 +229,8 @@ class CustomMethodMigrator {
       if (imp.contains('supabase_client_provider')) return false;
       // supabase_flutter importは生成ファイルに含まれるため除外
       if (imp.contains('package:supabase')) return false;
+      // model importは生成ファイルに含まれるため除外
+      if (imp.contains('.supafreeze.dart')) return false;
       return true;
     }).toList();
 

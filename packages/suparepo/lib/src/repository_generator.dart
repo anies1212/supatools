@@ -94,10 +94,13 @@ class RepositoryGenerator {
       buffer.writeln("import '${_config!.modelImportPath}';");
     }
 
-    // Custom imports from .custom.dart
+    // Custom imports from .custom.dart (excluding already-present imports)
     if (customContent != null) {
+      final existingCode = buffer.toString();
       for (final imp in customContent.imports) {
-        buffer.writeln(imp);
+        if (!existingCode.contains(imp)) {
+          buffer.writeln(imp);
+        }
       }
     }
 

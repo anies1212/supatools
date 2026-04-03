@@ -222,14 +222,15 @@ class RpcGenerator {
         final paramName = _escapeParamName(
           ReCase(param.name).camelCase,
         );
+        final value = _serializeParam(paramName, param);
         if (param.isRequired) {
           buffer.writeln(
-            "      '${param.name}': $paramName,",
+            "      '${param.name}': $value,",
           );
         } else {
           buffer.writeln(
             "      if ($paramName != null) "
-            "'${param.name}': $paramName,",
+            "'${param.name}': $value,",
           );
         }
       }
@@ -297,5 +298,24 @@ class RpcGenerator {
       return '$name\$';
     }
     return name;
+  }
+
+  /// Returns the serialization expression for a parameter value.
+  ///
+  /// DateTime parameters need to be converted to ISO8601 strings
+  /// before being passed to `_client.rpc()`, because `jsonEncode`
+  /// cannot serialize DateTime objects directly.
+  ///
+  /// - `date` → `YYYY-MM-DD` (date-only portion)
+  /// - `timestamp` / `timestamptz` → full ISO8601 string
+  String _serializeParam(String paramName, RpcParamInfo param) {
+    if (!TypeMapper.isDateTimeType(param.dataType)) {
+      return paramName;
+    }
+    final accessor = param.isRequired ? paramName : '$paramName?';
+    if (TypeMapper.isDateOnlyType(param.dataType)) {
+      return "$accessor.toIso8601String().split('T').first";
+    }
+    return '$accessor.toIso8601String()';
   }
 }

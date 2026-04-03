@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.11.4] - 2026-04-03
+
+### Fixed
+
+- Fix `DateTime` parameters in RPC functions failing with `jsonEncode` error ("Converting object to an encodable object failed: Instance of 'DateTime'")
+  - `date` params are now serialized as `YYYY-MM-DD` via `.toIso8601String().split('T').first`
+  - `timestamp` / `timestamptz` params are serialized as full ISO8601 via `.toIso8601String()`
+
 ## [1.11.3] - 2026-03-11
 
 ### Fixed

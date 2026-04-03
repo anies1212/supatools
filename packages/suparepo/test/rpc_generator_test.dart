@@ -405,6 +405,139 @@ void main() {
     });
   });
 
+  group('RpcGenerator (DateTime serialization)', () {
+    test('date型パラメータはdate部分のみの文字列に変換', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'toggle_receipt_for_date',
+          params: [
+            RpcParamInfo(
+              name: 'p_date',
+              dataType: 'date',
+              isRequired: true,
+            ),
+          ],
+          returnType: 'json',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(functions);
+
+      expect(output, contains('required DateTime pDate'));
+      expect(
+        output,
+        contains(
+          "'p_date': pDate.toIso8601String().split('T').first",
+        ),
+      );
+    });
+
+    test('timestamp型パラメータはISO8601文字列に変換', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'log_event',
+          params: [
+            RpcParamInfo(
+              name: 'event_time',
+              dataType: 'timestamp',
+              isRequired: true,
+            ),
+          ],
+          returnType: 'void',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(functions);
+
+      expect(output, contains('required DateTime eventTime'));
+      expect(
+        output,
+        contains("'event_time': eventTime.toIso8601String()"),
+      );
+    });
+
+    test('timestamptz型パラメータはISO8601文字列に変換', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'schedule_task',
+          params: [
+            RpcParamInfo(
+              name: 'scheduled_at',
+              dataType: 'timestamptz',
+              isRequired: true,
+            ),
+          ],
+          returnType: 'void',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(functions);
+
+      expect(
+        output,
+        contains(
+          "'scheduled_at': scheduledAt.toIso8601String()",
+        ),
+      );
+    });
+
+    test('optionalなdate型パラメータは?.で安全にアクセス', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'filter_by_date',
+          params: [
+            RpcParamInfo(
+              name: 'start_date',
+              dataType: 'date',
+              isRequired: false,
+            ),
+          ],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(functions);
+
+      expect(output, contains('DateTime? startDate'));
+      expect(
+        output,
+        contains(
+          "'start_date': "
+          "startDate?.toIso8601String().split('T').first",
+        ),
+      );
+    });
+
+    test('非DateTime型パラメータはそのまま渡される', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_user',
+          params: [
+            RpcParamInfo(
+              name: 'user_id',
+              dataType: 'uuid',
+              isRequired: true,
+            ),
+          ],
+          returnType: 'jsonb',
+          returnsSetOf: false,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(functions);
+
+      expect(output, contains("'user_id': userId,"));
+      expect(
+        output,
+        isNot(contains('toIso8601String')),
+      );
+    });
+  });
+
   group('RpcGenerator (generateResultModels)', () {
     test('tableColumnsを持つ関数は型付き戻り値', () {
       final functions = [

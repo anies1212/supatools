@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2] - 2026-04-03
+
+### Added
+
+- `TypeMapper.isDateTimeType()` — checks whether a PostgreSQL type (`date`, `timestamp`, `timestamptz`) maps to Dart `DateTime`
+- `TypeMapper.isDateOnlyType()` — checks whether a PostgreSQL type is date-only (`date`) with no time component
+
 ## [1.4.1] - 2026-03-11
 
 ### Fixed

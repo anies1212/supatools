@@ -262,6 +262,34 @@ class TypeMapper {
     'hstore': 'Map<String, String>',
   };
 
+  /// PostgreSQL date-only types (no time component)
+  static const Set<String> _dateOnlyTypes = {
+    'date',
+  };
+
+  /// PostgreSQL date/time types that map to DateTime
+  static const Set<String> _dateTimeTypes = {
+    'date',
+    'timestamp',
+    'timestamptz',
+    'timestamp without time zone',
+    'timestamp with time zone',
+  };
+
+  /// Returns true if the PostgreSQL type maps to Dart DateTime
+  static bool isDateTimeType(String pgType) {
+    final baseType =
+        pgType.endsWith('[]') ? pgType.substring(0, pgType.length - 2) : pgType;
+    return _dateTimeTypes.contains(baseType.toLowerCase());
+  }
+
+  /// Returns true if the PostgreSQL type is date-only (no time component)
+  static bool isDateOnlyType(String pgType) {
+    final baseType =
+        pgType.endsWith('[]') ? pgType.substring(0, pgType.length - 2) : pgType;
+    return _dateOnlyTypes.contains(baseType.toLowerCase());
+  }
+
   /// Check if the type needs a JsonKey annotation for proper serialization
   static bool needsJsonKey(String pgType) {
     final baseType =

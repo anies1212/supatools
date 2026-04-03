@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.11.5] - 2026-04-03
+
+### Fixed
+
+- Remove unnecessary null-aware operator (`?.`) on non-null DateTime params that caused `invalid_null_aware_operator` warning with `dart analyze --fatal-infos`
+
 ## [1.11.4] - 2026-04-03
 
 ### Fixed

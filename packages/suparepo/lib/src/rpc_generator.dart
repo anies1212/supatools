@@ -312,10 +312,9 @@ class RpcGenerator {
     if (!TypeMapper.isDateTimeType(param.dataType)) {
       return paramName;
     }
-    final accessor = param.isRequired ? paramName : '$paramName?';
     if (TypeMapper.isDateOnlyType(param.dataType)) {
-      return "$accessor.toIso8601String().split('T').first";
+      return "$paramName.toIso8601String().split('T').first";
     }
-    return '$accessor.toIso8601String()';
+    return '$paramName.toIso8601String()';
   }
 }

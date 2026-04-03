@@ -507,7 +507,7 @@ void main() {
         output,
         contains(
           "'start_date': "
-          "startDate?.toIso8601String().split('T').first",
+          "startDate.toIso8601String().split('T').first",
         ),
       );
     });

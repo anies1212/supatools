@@ -63,7 +63,10 @@ class RpcResultModelGenerator {
 
     for (final col in columns) {
       final fieldName = ReCase(col.name).camelCase;
-      final dartType = TypeMapper.mapType(col.dataType);
+      // json/jsonb → dynamic (can be object, array, or scalar)
+      final dartType = TypeMapper.isJsonType(col.dataType)
+          ? 'dynamic'
+          : TypeMapper.mapType(col.dataType);
       buffer.writeln('    required $dartType $fieldName,');
     }
 
@@ -79,13 +82,16 @@ class RpcResultModelGenerator {
 
     for (final col in columns) {
       final fieldName = ReCase(col.name).camelCase;
-      final dartType = TypeMapper.mapType(col.dataType);
+      final isJson = TypeMapper.isJsonType(col.dataType);
+      final dartType = isJson
+          ? 'dynamic'
+          : TypeMapper.mapType(col.dataType);
       if (dartType == 'DateTime') {
         buffer.writeln(
           "        $fieldName: "
           "DateTime.parse(row['${col.name}'] as String),",
         );
-      } else if (dartType == 'dynamic') {
+      } else if (isJson) {
         buffer.writeln(
           "        $fieldName: row['${col.name}'],",
         );

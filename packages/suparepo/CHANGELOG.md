@@ -1,11 +1,18 @@
 # Changelog
 
+## [1.13.2] - 2026-04-08
+
+### Fixed
+
+- Revert global `json`/`jsonb` → `dynamic` mapping; restore `Map<String, dynamic>` in TypeMapper for general use (repositories, etc.)
+- Scope `dynamic` mapping to **RPC result models only** — `json`/`jsonb` columns in `RETURNS TABLE` are `dynamic` in generated Freezed models (safe for both `json_agg` arrays and `json_build_object` objects), while repositories keep `Map<String, dynamic>`
+
 ## [1.13.1] - 2026-04-08
 
 ### Fixed
 
 - Fix `RETURNS TABLE` single-row RPC causing `type '_Map<String, dynamic>' is not a subtype of type 'List<dynamic>'` error — PostgREST may return a single object instead of an array; generated code now normalizes the response with `rawResponse is List ? rawResponse : [rawResponse]`
-- Fix `json` / `jsonb` column type mapping from `Map<String, dynamic>` to `dynamic` — `json_agg()` returns a JSON array (`List<dynamic>`), not a Map, so `dynamic` is the safe mapping
+- Fix `json` / `jsonb` column type mapping in RPC result models to `dynamic` — `json_agg()` returns a JSON array (`List<dynamic>`), not a Map
 - Fix `fromRow()` generation for `dynamic` fields — no longer emits redundant `as dynamic` cast
 
 ## [1.13.0] - 2026-04-08

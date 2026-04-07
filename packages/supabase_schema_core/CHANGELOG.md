@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.2] - 2026-04-08
+
+### Added
+
+- `TypeMapper.isJsonType()` — returns true for `json`/`jsonb` PostgreSQL types, allowing callers to scope `dynamic` mapping to specific contexts (e.g. RPC result models) instead of globally
+
+### Fixed
+
+- Revert `json`/`jsonb` mapping back to `Map<String, dynamic>` in `TypeMapper` — the global `dynamic` change in v1.5.1 was too broad; callers that need `dynamic` should use `isJsonType()` to decide
+
 ## [1.5.1] - 2026-04-08
 
 ### Fixed

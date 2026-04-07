@@ -177,7 +177,7 @@ void main() {
       );
     });
 
-    test('jsonb型の列', () {
+    test('jsonb型の列はdynamic（RPC result modelのみ）', () {
       final func = RpcFunctionInfo(
         name: 'get_data',
         params: [],
@@ -193,11 +193,98 @@ void main() {
 
       final output = generator.generateResultModel(func)!;
 
+      // フィールド型は dynamic
       expect(
         output,
         contains(
           'required dynamic metadata,',
         ),
+      );
+      // fromRow で as キャストなし
+      expect(
+        output,
+        contains("metadata: row['metadata'],"),
+      );
+      // as dynamic は冗長なので含まない
+      expect(
+        output,
+        isNot(contains("as dynamic")),
+      );
+    });
+
+    test('json型の列もdynamic（json_agg等の配列対応）', () {
+      final func = RpcFunctionInfo(
+        name: 'get_detail',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'calendar', dataType: 'json'),
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      expect(
+        output,
+        contains('required dynamic calendar,'),
+      );
+      expect(
+        output,
+        contains("calendar: row['calendar'],"),
+      );
+    });
+
+    test('RETURNS TABLE に json/非json カラム混在', () {
+      final func = RpcFunctionInfo(
+        name: 'get_membership_rank_detail',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'rank', dataType: 'text'),
+          RpcTableColumn(
+            name: 'upload_days',
+            dataType: 'int4',
+          ),
+          RpcTableColumn(
+            name: 'calendar',
+            dataType: 'json',
+          ),
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      // text/int4 は通常の型マッピング
+      expect(
+        output,
+        contains('required String rank,'),
+      );
+      expect(
+        output,
+        contains('required int uploadDays,'),
+      );
+      // json は dynamic
+      expect(
+        output,
+        contains('required dynamic calendar,'),
+      );
+      // fromRow: text/int4 は as キャスト
+      expect(
+        output,
+        contains("rank: row['rank'] as String,"),
+      );
+      expect(
+        output,
+        contains(
+          "uploadDays: row['upload_days'] as int,",
+        ),
+      );
+      // fromRow: json は as キャストなし
+      expect(
+        output,
+        contains("calendar: row['calendar'],"),
       );
     });
 

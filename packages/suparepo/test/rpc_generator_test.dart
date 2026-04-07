@@ -146,7 +146,7 @@ void main() {
       final output = generator.generateRpcClient(functions);
 
       expect(output, contains('class SupabaseRpcClient'));
-      expect(output, contains('Future<List<dynamic>>'));
+      expect(output, contains('Future<List<Map<String, dynamic>>>'));
       expect(output, contains('getUserPosts'));
       expect(output, contains('required String userId'));
       expect(
@@ -155,7 +155,70 @@ void main() {
       );
       expect(output, contains("'user_id': userId"));
       expect(output, contains('/// Get posts by user'));
-      expect(output, contains('response.cast<dynamic>()'));
+      expect(output, contains('response.cast<Map<String, dynamic>>()'));
+    });
+
+    test('setof関数はrawResponse→responseの正規化コードを生成', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_items',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+        ),
+      ];
+
+      final output = generator.generateRpcClient(functions);
+
+      // rpc<dynamic> で呼び出し
+      expect(
+        output,
+        contains("_client.rpc<dynamic>('get_items')"),
+      );
+      // rawResponse を正規化して response に
+      expect(
+        output,
+        contains(
+          'final response = rawResponse is List'
+          ' ? rawResponse : [rawResponse];',
+        ),
+      );
+    });
+
+    test('RETURNS TABLE + result model も rawResponse 正規化', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_rank_info',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(name: 'rank', dataType: 'text'),
+            RpcTableColumn(
+              name: 'upload_days',
+              dataType: 'int4',
+            ),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      // rawResponse → response 正規化
+      expect(
+        output,
+        contains('rawResponse is List'),
+      );
+      // 正規化後に fromRow マッピング
+      expect(
+        output,
+        contains(
+          '.map(GetRankInfoResult.fromRow).toList()',
+        ),
+      );
     });
 
     test('パラメータなし関数のクライアント生成', () {
@@ -603,7 +666,7 @@ void main() {
 
       expect(
         output,
-        contains('Future<List<dynamic>>'),
+        contains('Future<List<Map<String, dynamic>>>'),
       );
       expect(
         output,
@@ -631,7 +694,7 @@ void main() {
 
       expect(
         output,
-        contains('Future<List<dynamic>>'),
+        contains('Future<List<Map<String, dynamic>>>'),
       );
       expect(
         output,
@@ -674,7 +737,7 @@ void main() {
       );
       expect(
         output,
-        contains('Future<List<dynamic>>'),
+        contains('Future<List<Map<String, dynamic>>>'),
       );
       expect(output, contains('Future<int>'));
       // 型付き関数のimportのみ

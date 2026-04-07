@@ -193,8 +193,8 @@ class TypeMapper {
     // ===================
     // JSON Types
     // ===================
-    'json': 'dynamic',
-    'jsonb': 'dynamic',
+    'json': 'Map<String, dynamic>',
+    'jsonb': 'Map<String, dynamic>',
 
     // ===================
     // Range Types
@@ -292,6 +292,18 @@ class TypeMapper {
 
   /// Check if the type needs a JsonKey annotation for proper serialization
   static bool needsJsonKey(String pgType) {
+    final baseType =
+        pgType.endsWith('[]') ? pgType.substring(0, pgType.length - 2) : pgType;
+    return ['json', 'jsonb'].contains(baseType.toLowerCase());
+  }
+
+  /// Returns true if the PostgreSQL type is json or jsonb.
+  ///
+  /// JSON columns can hold objects, arrays, or scalars at runtime,
+  /// so callers that need runtime safety (e.g. RPC result models)
+  /// may choose to map these to `dynamic` instead of
+  /// `Map<String, dynamic>`.
+  static bool isJsonType(String pgType) {
     final baseType =
         pgType.endsWith('[]') ? pgType.substring(0, pgType.length - 2) : pgType;
     return ['json', 'jsonb'].contains(baseType.toLowerCase());

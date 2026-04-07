@@ -721,6 +721,77 @@ END;
       expect(columns[1].dataType, 'int4[]');
     });
 
+    test('coalesce(..., false) → bool', () {
+      final source = '''
+BEGIN
+  RETURN json_build_object(
+    'date', g.d::date,
+    'uploaded', coalesce(
+      (select true from t1),
+      (select true from t2),
+      false
+    )
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(2));
+      expect(columns[0].name, 'date');
+      expect(columns[0].dataType, 'date');
+      expect(columns[1].name, 'uploaded');
+      expect(columns[1].dataType, 'bool');
+    });
+
+    test('coalesce(..., 0) → int4', () {
+      final source = '''
+BEGIN
+  RETURN json_build_object(
+    'count', coalesce(v_count, 0)
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(1));
+      expect(columns[0].name, 'count');
+      expect(columns[0].dataType, 'int4');
+    });
+
+    test('NOT expr → bool', () {
+      final source = '''
+BEGIN
+  RETURN json_build_object(
+    'is_new', not v_exists
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(1));
+      expect(columns[0].name, 'is_new');
+      expect(columns[0].dataType, 'bool');
+    });
+
+    test('EXISTS(...) → bool', () {
+      final source = '''
+BEGIN
+  RETURN json_build_object(
+    'has_items', exists(select 1 from items)
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(1));
+      expect(columns[0].name, 'has_items');
+      expect(columns[0].dataType, 'bool');
+    });
+
     test('no json_build_object returns empty', () {
       final source = '''
 BEGIN

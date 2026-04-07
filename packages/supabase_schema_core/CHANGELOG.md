@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.1] - 2026-04-08
+
+### Fixed
+
+- Improve `_resolveType` to infer types from complex SQL expressions:
+  - `coalesce(..., false/true)` → `bool`
+  - `coalesce(..., 0)` → `int4`
+  - `NOT expr` → `bool`
+  - `EXISTS(...)` → `bool`
+  - Boolean operators (`AND`, `OR`, `IS NULL`) → `bool`
+
 ## [1.7.0] - 2026-04-08
 
 ### Added

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.15.1] - 2026-04-08
+
+### Fixed
+
+- Fix `json_build_object` type inference for complex expressions — `coalesce(..., false)` now infers `bool`, `coalesce(..., 0)` infers `int4`, `NOT expr` and `EXISTS(...)` infer `bool`, instead of falling back to `String`
+
 ## [1.15.0] - 2026-04-08
 
 ### Added

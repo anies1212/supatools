@@ -724,23 +724,71 @@ class SchemaFetcher {
     final varType = varTypes[normalized];
     if (varType != null) return varType;
 
-    // Common patterns
+    // Boolean literals
     if (normalized == 'true' || normalized == 'false') {
       return 'bool';
     }
+    // Numeric literals
     if (RegExp(r'^\d+$').hasMatch(normalized)) return 'int4';
     if (RegExp(r'^\d+\.\d+$').hasMatch(normalized)) {
       return 'float8';
     }
+    // String literals
     if (normalized.startsWith("'")) return 'text';
+    // Type cast: expr::type
     if (normalized.contains('::')) {
-      // Type cast: expr::type
       final castType = normalized.split('::').last.trim();
       return castType;
     }
 
+    // coalesce(..., literal) — infer from last argument
+    final coalesceMatch = RegExp(
+      r'^coalesce\s*\(([\s\S]+)\)$',
+      caseSensitive: false,
+    ).firstMatch(normalized);
+    if (coalesceMatch != null) {
+      final inner = coalesceMatch.group(1)!;
+      // Extract the last argument (the fallback value)
+      final lastArg = _extractLastArg(inner);
+      if (lastArg != null) {
+        final inferred = _resolveType(lastArg, varTypes);
+        if (inferred != 'text') return inferred;
+      }
+    }
+
+    // NOT expr → bool
+    if (normalized.startsWith('not ') ||
+        normalized.startsWith('not(')) {
+      return 'bool';
+    }
+    // EXISTS(...) → bool
+    if (normalized.startsWith('exists(') ||
+        normalized.startsWith('exists (')) {
+      return 'bool';
+    }
+    // Boolean operators: expr AND/OR expr, expr IS NULL, etc.
+    if (RegExp(r'\b(and|or|is\s+null|is\s+not\s+null)\b')
+        .hasMatch(normalized)) {
+      return 'bool';
+    }
+
     // Fallback
     return 'text';
+  }
+
+  /// Extracts the last argument from a comma-separated list,
+  /// respecting parenthesis nesting.
+  static String? _extractLastArg(String args) {
+    var depth = 0;
+    var lastComma = -1;
+    for (var i = 0; i < args.length; i++) {
+      if (args[i] == '(') depth++;
+      if (args[i] == ')') depth--;
+      if (args[i] == ',' && depth == 0) lastComma = i;
+    }
+    if (lastComma == -1) return null;
+    final last = args.substring(lastComma + 1).trim();
+    return last.isEmpty ? null : last;
   }
 
   /// Fetches nested JSON column structures from function bodies

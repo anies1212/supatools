@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2] - 2026-04-08
+
+### Fixed
+
+- Fix `_resolveType` order: `coalesce`/`NOT`/`EXISTS` checks now run before `::` cast detection, preventing `::type` inside nested subqueries from being misidentified as the expression type
+- Harden `parseJsonBuildObject` and `_tokenizeBuildObjectArgs` to skip SQL string literals during parenthesis depth tracking
+
 ## [1.7.1] - 2026-04-08
 
 ### Fixed

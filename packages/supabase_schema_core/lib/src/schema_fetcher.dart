@@ -596,37 +596,48 @@ class SchemaFetcher {
   /// Infers types from variable declarations (`DECLARE v_foo type;`)
   /// or parameter declarations in the function signature.
   static List<RpcTableColumn> parseJsonBuildObject(String source) {
-    // Find json_build_object(...) or jsonb_build_object(...)
-    final buildObjPattern = RegExp(
-      r'jsonb?_build_object\s*\(([\s\S]*?)\)\s*;',
+    // Find json_build_object( or jsonb_build_object( start position
+    final startPattern = RegExp(
+      r'jsonb?_build_object\s*\(',
       caseSensitive: false,
     );
-    final match = buildObjPattern.firstMatch(source);
-    if (match == null) return [];
+    final startMatch = startPattern.firstMatch(source);
+    if (startMatch == null) return [];
 
-    final argsStr = match.group(1)!;
+    // Manually find matching closing paren (handles nested parens
+    // and skips string literals to avoid miscounting)
+    final argsStart = startMatch.end;
+    var depth = 1;
+    var argsEnd = argsStart;
+    var inStr = false;
+    for (var i = argsStart; i < source.length; i++) {
+      if (source[i] == "'" && !inStr) {
+        inStr = true;
+        continue;
+      }
+      if (source[i] == "'" && inStr) {
+        if (i + 1 < source.length && source[i + 1] == "'") {
+          i++;
+          continue;
+        }
+        inStr = false;
+        continue;
+      }
+      if (inStr) continue;
+      if (source[i] == '(') depth++;
+      if (source[i] == ')') depth--;
+      if (depth == 0) {
+        argsEnd = i;
+        break;
+      }
+    }
 
-    // Extract key-value pairs: 'key', expression, 'key', expression, ...
-    final tokens = _tokenizeBuildObjectArgs(argsStr);
-    if (tokens.length < 2) return [];
+    final argsStr = source.substring(argsStart, argsEnd);
 
     // Build variable → type map from DECLARE section and params
     final varTypes = _extractVariableTypes(source);
 
-    final columns = <RpcTableColumn>[];
-    for (var i = 0; i + 1 < tokens.length; i += 2) {
-      final key = tokens[i];
-      final valueExpr = tokens[i + 1].trim();
-
-      // Try to resolve type from variable declarations
-      final dataType = _resolveType(valueExpr, varTypes);
-      columns.add(RpcTableColumn(
-        name: key,
-        dataType: dataType,
-      ));
-    }
-
-    return columns;
+    return _parseBuildObjectColumns(argsStr, varTypes);
   }
 
   /// Tokenizes the arguments of json_build_object(...) into
@@ -644,6 +655,30 @@ class SchemaFetcher {
       final ch = args[i];
 
       if (ch == "'" && !inString) {
+        if (depth > 0) {
+          // Nested string (inside coalesce, subquery, etc.)
+          // Scan to closing quote and add to value buffer.
+          current.write(ch);
+          i++;
+          while (i < args.length) {
+            current.write(args[i]);
+            if (args[i] == "'") {
+              if (i + 1 < args.length && args[i + 1] == "'") {
+                i++;
+                current.write(args[i]);
+                i++;
+                continue;
+              }
+              break; // closing quote found
+            }
+            i++;
+          }
+          // i is at closing quote; outer for-loop i++ will
+          // advance past it. No further action needed.
+          // Fall through to next iteration via outer for-loop.
+          continue;
+        }
+        // Top-level string literal = json_build_object key
         inString = true;
         current = StringBuffer();
         continue;
@@ -735,13 +770,10 @@ class SchemaFetcher {
     }
     // String literals
     if (normalized.startsWith("'")) return 'text';
-    // Type cast: expr::type
-    if (normalized.contains('::')) {
-      final castType = normalized.split('::').last.trim();
-      return castType;
-    }
 
     // coalesce(..., literal) — infer from last argument
+    // Must be checked BEFORE :: cast to avoid matching
+    // :: inside nested subqueries
     final coalesceMatch = RegExp(
       r'^coalesce\s*\(([\s\S]+)\)$',
       caseSensitive: false,
@@ -770,6 +802,13 @@ class SchemaFetcher {
     if (RegExp(r'\b(and|or|is\s+null|is\s+not\s+null)\b')
         .hasMatch(normalized)) {
       return 'bool';
+    }
+
+    // Type cast: expr::type (checked after coalesce/NOT/EXISTS
+    // to avoid matching :: inside nested subqueries)
+    if (normalized.contains('::')) {
+      final castType = normalized.split('::').last.trim();
+      return castType;
     }
 
     // Fallback

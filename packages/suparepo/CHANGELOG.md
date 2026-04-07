@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.2] - 2026-04-08
+
+### Fixed
+
+- Fix `coalesce` type inference failing when subqueries contain `::` type casts (e.g. `coalesce((select true from t where (x)::date = y::date), false)`) — the `::` check was evaluated before `coalesce`, causing `::date` inside the subquery to be mistakenly used as the return type
+- Harden `_tokenizeBuildObjectArgs` to correctly handle SQL string literals (e.g. `'Asia/Tokyo'`) nested inside subqueries within `json_build_object` arguments
+
 ## [1.15.1] - 2026-04-08
 
 ### Fixed

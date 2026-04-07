@@ -792,6 +792,35 @@ END;
       expect(columns[0].dataType, 'bool');
     });
 
+    test('coalesce with subqueries → bool', () {
+      final source = """
+BEGIN
+  RETURN json_build_object(
+    'date', g.d::date,
+    'uploaded', coalesce(
+      (select true
+       from public.receipts r
+       where r.user_id = v_user_id
+         and (r.created_at at time zone 'Asia/Tokyo')::date = g.d::date),
+      (select true
+       from public.ticket_usages tu
+       where tu.user_id = v_user_id
+         and tu.used_for_date = g.d::date),
+      false
+    )
+  );
+END;
+""";
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(2));
+      expect(columns[0].name, 'date');
+      expect(columns[0].dataType, 'date');
+      expect(columns[1].name, 'uploaded');
+      expect(columns[1].dataType, 'bool');
+    });
+
     test('no json_build_object returns empty', () {
       final source = '''
 BEGIN

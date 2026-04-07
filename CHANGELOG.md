@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.13.1 / supabase_schema_core 1.5.1] - 2026-04-08
+
+### Fixed
+
+- **suparepo**: Fix `RETURNS TABLE` single-row RPC crash (`Map` not subtype of `List`) by normalizing response
+- **supabase_schema_core**: Map `json`/`jsonb` to `dynamic` instead of `Map<String, dynamic>` (fixes `json_agg` cast errors)
+
 ## [suparepo 1.13.0 / supabase_schema_core 1.5.0] - 2026-04-08
 
 ### Added

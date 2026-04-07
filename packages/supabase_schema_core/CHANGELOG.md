@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1] - 2026-04-08
+
+### Fixed
+
+- Map `json` / `jsonb` PostgreSQL types to `dynamic` instead of `Map<String, dynamic>` — JSON values can be arrays (`json_agg`), objects, or scalars, so `dynamic` is the safe Dart type
+
 ## [1.5.0] - 2026-04-08
 
 ### Added

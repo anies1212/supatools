@@ -196,7 +196,7 @@ void main() {
       expect(
         output,
         contains(
-          'required Map<String, dynamic> metadata,',
+          'required dynamic metadata,',
         ),
       );
     });

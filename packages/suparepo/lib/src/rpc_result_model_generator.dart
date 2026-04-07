@@ -85,6 +85,10 @@ class RpcResultModelGenerator {
           "        $fieldName: "
           "DateTime.parse(row['${col.name}'] as String),",
         );
+      } else if (dartType == 'dynamic') {
+        buffer.writeln(
+          "        $fieldName: row['${col.name}'],",
+        );
       } else {
         buffer.writeln(
           "        $fieldName: row['${col.name}'] as $dartType,",

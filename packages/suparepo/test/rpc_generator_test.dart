@@ -146,16 +146,16 @@ void main() {
       final output = generator.generateRpcClient(functions);
 
       expect(output, contains('class SupabaseRpcClient'));
-      expect(output, contains('Future<List<Map<String, dynamic>>>'));
+      expect(output, contains('Future<List<dynamic>>'));
       expect(output, contains('getUserPosts'));
       expect(output, contains('required String userId'));
       expect(
         output,
-        contains("_client.rpc<List<dynamic>>('get_user_posts'"),
+        contains("_client.rpc<dynamic>('get_user_posts'"),
       );
       expect(output, contains("'user_id': userId"));
       expect(output, contains('/// Get posts by user'));
-      expect(output, contains('response.cast<Map<String, dynamic>>()'));
+      expect(output, contains('response.cast<dynamic>()'));
     });
 
     test('パラメータなし関数のクライアント生成', () {
@@ -603,7 +603,7 @@ void main() {
 
       expect(
         output,
-        contains('Future<List<Map<String, dynamic>>>'),
+        contains('Future<List<dynamic>>'),
       );
       expect(
         output,
@@ -631,7 +631,7 @@ void main() {
 
       expect(
         output,
-        contains('Future<List<Map<String, dynamic>>>'),
+        contains('Future<List<dynamic>>'),
       );
       expect(
         output,
@@ -674,7 +674,7 @@ void main() {
       );
       expect(
         output,
-        contains('Future<List<Map<String, dynamic>>>'),
+        contains('Future<List<dynamic>>'),
       );
       expect(output, contains('Future<int>'));
       // 型付き関数のimportのみ

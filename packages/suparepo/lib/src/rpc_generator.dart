@@ -212,8 +212,8 @@ class RpcGenerator {
       prefix = '    return await';
       typeArg = dartReturnType;
     } else {
-      prefix = '    final response = await';
-      typeArg = 'List<dynamic>';
+      prefix = '    final rawResponse = await';
+      typeArg = 'dynamic';
     }
 
     if (func.params.isNotEmpty) {
@@ -258,6 +258,17 @@ class RpcGenerator {
   ) {
     // void and scalar are handled inline (await / return await)
     if (!func.returnsSetOf && !_hasResultModel(func)) return;
+
+    // Normalize response: PostgREST may return a single object
+    // instead of an array for RETURNS TABLE with one row.
+    if (func.returnsSetOf || _hasResultModel(func)) {
+      if (!_hasSingleResultModel(func)) {
+        buffer.writeln(
+          '    final response = rawResponse is List'
+          ' ? rawResponse : [rawResponse];',
+        );
+      }
+    }
 
     if (_hasResultModel(func)) {
       final className = RpcResultModelGenerator.resultClassName(func.name);

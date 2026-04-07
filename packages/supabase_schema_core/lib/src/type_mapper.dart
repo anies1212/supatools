@@ -193,8 +193,8 @@ class TypeMapper {
     // ===================
     // JSON Types
     // ===================
-    'json': 'Map<String, dynamic>',
-    'jsonb': 'Map<String, dynamic>',
+    'json': 'dynamic',
+    'jsonb': 'dynamic',
 
     // ===================
     // Range Types

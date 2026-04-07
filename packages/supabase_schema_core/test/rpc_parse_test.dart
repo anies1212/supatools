@@ -751,6 +751,98 @@ END;
       expect(columns[1].dataType, 'text');
     });
   });
+
+  group('parseRpcErrorCodes', () {
+    test('return query select false パターン', () {
+      final source = '''
+BEGIN
+  IF condition1 THEN
+    return query select false, 'daily_limit_exceeded'::text;
+  END IF;
+  IF condition2 THEN
+    return query select false, 'insufficient_balance'::text;
+  END IF;
+  return query select true, ''::text;
+END;
+''';
+
+      final codes = SchemaFetcher.parseRpcErrorCodes(source);
+
+      expect(codes, hasLength(2));
+      expect(codes, contains('daily_limit_exceeded'));
+      expect(codes, contains('insufficient_balance'));
+    });
+
+    test('return query select false::bool パターン', () {
+      final source = '''
+BEGIN
+  return query select false::bool, 'account_age_requirement'::text;
+  return query select true::bool, ''::text;
+END;
+''';
+
+      final codes = SchemaFetcher.parseRpcErrorCodes(source);
+
+      expect(codes, hasLength(1));
+      expect(codes, contains('account_age_requirement'));
+    });
+
+    test('error := パターン', () {
+      final source = '''
+DECLARE
+  error text;
+BEGIN
+  error := 'rate_limited';
+  error := 'invalid_input';
+  return query select false, error;
+END;
+''';
+
+      final codes = SchemaFetcher.parseRpcErrorCodes(source);
+
+      expect(codes, hasLength(2));
+      expect(codes, contains('rate_limited'));
+      expect(codes, contains('invalid_input'));
+    });
+
+    test('空文字列と非snake_caseは無視', () {
+      final source = '''
+BEGIN
+  return query select false, ''::text;
+  return query select false, 'This is not a code'::text;
+  return query select false, 'valid_code'::text;
+END;
+''';
+
+      final codes = SchemaFetcher.parseRpcErrorCodes(source);
+
+      expect(codes, hasLength(1));
+      expect(codes, contains('valid_code'));
+    });
+
+    test('エラーコードなしは空リスト', () {
+      final source = '''
+BEGIN
+  return query select true, ''::text;
+END;
+''';
+
+      final codes = SchemaFetcher.parseRpcErrorCodes(source);
+      expect(codes, isEmpty);
+    });
+
+    test('重複コードは除去される', () {
+      final source = '''
+BEGIN
+  return query select false, 'same_error'::text;
+  return query select false, 'same_error'::text;
+END;
+''';
+
+      final codes = SchemaFetcher.parseRpcErrorCodes(source);
+      expect(codes, hasLength(1));
+    });
+  });
 }
 
 Map<String, dynamic> _buildSpec(Map<String, dynamic> paths) {

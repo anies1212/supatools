@@ -131,6 +131,11 @@ class RpcFunctionInfo {
   /// Non-null when the function uses `RETURNS TABLE(col1 type1, ...)`.
   final List<RpcTableColumn>? tableColumns;
 
+  /// Error codes detected from PL/pgSQL source.
+  /// Non-null when the function has an `error text` column and
+  /// error code string literals are found in the function body.
+  final List<String>? errorCodes;
+
   const RpcFunctionInfo({
     required this.name,
     required this.params,
@@ -138,12 +143,14 @@ class RpcFunctionInfo {
     this.returnsSetOf = false,
     this.description,
     this.tableColumns,
+    this.errorCodes,
   });
 
   RpcFunctionInfo copyWith({
     String? returnType,
     bool? returnsSetOf,
     List<RpcTableColumn>? tableColumns,
+    List<String>? errorCodes,
   }) =>
       RpcFunctionInfo(
         name: name,
@@ -152,6 +159,7 @@ class RpcFunctionInfo {
         returnsSetOf: returnsSetOf ?? this.returnsSetOf,
         description: description,
         tableColumns: tableColumns ?? this.tableColumns,
+        errorCodes: errorCodes ?? this.errorCodes,
       );
 
   @override
@@ -369,6 +377,25 @@ class SchemaFetcher {
         }).toList();
       } catch (_) {
         // JSON列自動検出の失敗は無視して続行
+      }
+
+      // error text カラムを持つ関数のエラーコード自動検出
+      try {
+        final errorCodesMap = await _fetchRpcErrorCodes();
+        merged = merged.map((func) {
+          final codes = errorCodesMap[func.name];
+          if (codes == null) return func;
+          // error text カラムがあるか確認
+          final hasErrorCol = func.tableColumns?.any(
+            (c) =>
+                (c.name == 'error' || c.name == 'error_code') &&
+                c.dataType == 'text',
+          );
+          if (hasErrorCol != true) return func;
+          return func.copyWith(errorCodes: codes);
+        }).toList();
+      } catch (_) {
+        // エラーコード自動検出の失敗は無視して続行
       }
 
       return merged;
@@ -680,6 +707,80 @@ class SchemaFetcher {
 
     // Fallback
     return 'text';
+  }
+
+  /// Fetches error codes from PL/pgSQL function bodies for functions
+  /// that have an `error text` column in `RETURNS TABLE`.
+  Future<Map<String, List<String>>> _fetchRpcErrorCodes() async {
+    final query = '''
+      SELECT json_agg(sub) FROM (
+        SELECT
+          p.proname AS function_name,
+          p.prosrc AS source
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = '$schema'
+          AND p.proargmodes IS NOT NULL
+          AND 't' = ANY(p.proargmodes)
+          AND p.prosrc IS NOT NULL
+      ) sub
+    ''';
+
+    final response = await _executeRawQuery(query);
+    final result = <String, List<String>>{};
+
+    final rows = response is List ? response : <dynamic>[];
+    for (final row in rows) {
+      final funcName = row['function_name'] as String;
+      final source = row['source'] as String;
+      final codes = parseRpcErrorCodes(source);
+      if (codes.isNotEmpty) {
+        result[funcName] = codes;
+      }
+    }
+
+    return result;
+  }
+
+  /// Parses PL/pgSQL source to extract error code string literals.
+  ///
+  /// Detects patterns like:
+  /// - `return query select false, 'error_code'::text;`
+  /// - `return query select false::bool, 'error_code'::text;`
+  /// - `error := 'error_code';`
+  ///
+  /// Only returns snake_case codes (ignores empty strings and
+  /// non-code values).
+  static List<String> parseRpcErrorCodes(String source) {
+    final codes = <String>{};
+
+    // Pattern 1: return query select false, 'code'::text
+    final returnQueryPattern = RegExp(
+      r"return\s+query\s+select\s+false(?:::bool)?\s*,\s*'([^']+)'",
+      caseSensitive: false,
+    );
+    for (final m in returnQueryPattern.allMatches(source)) {
+      final code = m.group(1)!.trim();
+      if (_isSnakeCaseCode(code)) codes.add(code);
+    }
+
+    // Pattern 2: error := 'code'
+    final assignPattern = RegExp(
+      r"(?:error|error_code)\s*:=\s*'([^']+)'",
+      caseSensitive: false,
+    );
+    for (final m in assignPattern.allMatches(source)) {
+      final code = m.group(1)!.trim();
+      if (_isSnakeCaseCode(code)) codes.add(code);
+    }
+
+    return codes.toList()..sort();
+  }
+
+  /// Returns true if the string looks like a snake_case error code.
+  static bool _isSnakeCaseCode(String s) {
+    if (s.isEmpty) return false;
+    return RegExp(r'^[a-z][a-z0-9]*(_[a-z0-9]+)*$').hasMatch(s);
   }
 
   static const _plpgsqlKeywords = {

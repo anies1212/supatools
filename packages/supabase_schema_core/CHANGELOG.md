@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0] - 2026-04-08
+
+### Added
+
+- `SchemaFetcher.parseRpcErrorCodes()` — parses PL/pgSQL function source to extract snake_case error code literals from `return query select false, 'code'::text` and `error := 'code'` patterns
+- `RpcFunctionInfo.errorCodes` field for detected error codes
+- `SchemaFetcher._fetchRpcErrorCodes()` — queries `pg_proc.prosrc` for functions with `error text` columns in `RETURNS TABLE`
+
 ## [1.5.2] - 2026-04-08
 
 ### Added

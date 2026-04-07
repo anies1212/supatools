@@ -367,4 +367,205 @@ void main() {
       expect(result, isEmpty);
     });
   });
+
+  group('generateErrorClass', () {
+    test('sealed error class を生成', () {
+      final func = RpcFunctionInfo(
+        name: 'execute_exchange_atomic',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'success', dataType: 'bool'),
+          RpcTableColumn(name: 'error', dataType: 'text'),
+        ],
+        errorCodes: [
+          'daily_limit_exceeded',
+          'insufficient_balance',
+        ],
+      );
+
+      final output = generator.generateErrorClass(func)!;
+
+      // sealed class
+      expect(
+        output,
+        contains(
+          'sealed class ExecuteExchangeAtomicError',
+        ),
+      );
+      // named constructors
+      expect(
+        output,
+        contains(
+          'ExecuteExchangeAtomicError.dailyLimitExceeded()',
+        ),
+      );
+      expect(
+        output,
+        contains(
+          'ExecuteExchangeAtomicError.insufficientBalance()',
+        ),
+      );
+      // unknown variant
+      expect(
+        output,
+        contains(
+          'ExecuteExchangeAtomicError.unknown({',
+        ),
+      );
+      expect(
+        output,
+        contains('required String code,'),
+      );
+      // fromErrorCode factory
+      expect(
+        output,
+        contains(
+          'ExecuteExchangeAtomicError.fromErrorCode(',
+        ),
+      );
+      // switch cases
+      expect(
+        output,
+        contains("'daily_limit_exceeded' =>"),
+      );
+      expect(
+        output,
+        contains("'insufficient_balance' =>"),
+      );
+      // Freezed annotation
+      expect(output, contains('@freezed'));
+      expect(output, contains('.freezed.dart'));
+    });
+
+    test('errorCodes が null なら null を返す', () {
+      final func = RpcFunctionInfo(
+        name: 'get_data',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'data', dataType: 'text'),
+        ],
+      );
+
+      expect(generator.generateErrorClass(func), isNull);
+    });
+
+    test('errorCodes が空なら null を返す', () {
+      final func = RpcFunctionInfo(
+        name: 'get_data',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'error', dataType: 'text'),
+        ],
+        errorCodes: [],
+      );
+
+      expect(generator.generateErrorClass(func), isNull);
+    });
+  });
+
+  group('generateResultModel with errorCodes', () {
+    test('error カラムがエラー型に置換される', () {
+      final func = RpcFunctionInfo(
+        name: 'execute_exchange_atomic',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(
+            name: 'success',
+            dataType: 'bool',
+          ),
+          RpcTableColumn(
+            name: 'error',
+            dataType: 'text',
+          ),
+        ],
+        errorCodes: [
+          'daily_limit_exceeded',
+          'insufficient_balance',
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      // error フィールドはエラー型
+      expect(
+        output,
+        contains(
+          'required ExecuteExchangeAtomicError error,',
+        ),
+      );
+      // fromRow で fromErrorCode 変換
+      expect(
+        output,
+        contains(
+          'ExecuteExchangeAtomicError.fromErrorCode('
+          "row['error'] as String)",
+        ),
+      );
+      // import
+      expect(
+        output,
+        contains(
+          "import 'execute_exchange_atomic_error.dart'",
+        ),
+      );
+      // success は通常の bool
+      expect(
+        output,
+        contains('required bool success,'),
+      );
+    });
+  });
+
+  group('generateAllErrorClasses', () {
+    test('errorCodes を持つ関数のみ生成', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'execute_exchange',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(
+              name: 'success',
+              dataType: 'bool',
+            ),
+            RpcTableColumn(
+              name: 'error',
+              dataType: 'text',
+            ),
+          ],
+          errorCodes: ['some_error'],
+        ),
+        RpcFunctionInfo(
+          name: 'get_data',
+          params: [],
+          returnType: 'jsonb',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(
+              name: 'value',
+              dataType: 'text',
+            ),
+          ],
+        ),
+      ];
+
+      final result =
+          generator.generateAllErrorClasses(functions);
+
+      expect(result, hasLength(1));
+      expect(
+        result.containsKey('execute_exchange_error.dart'),
+        isTrue,
+      );
+    });
+  });
 }

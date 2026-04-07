@@ -349,6 +349,27 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
         resultModelsImportPrefix = '${p.relative(modelsDir, from: rpcDir)}/';
       }
     }
+
+    // Generate error classes for functions with detected error codes
+    final errorFiles = modelGenerator.generateAllErrorClasses(filtered);
+    if (errorFiles.isNotEmpty) {
+      final rpcOutputPath =
+          config.rpc.output ?? p.join(config.output, 'rpc_client.dart');
+      final rpcDir = p.dirname(rpcOutputPath);
+      final modelsDir = config.rpc.resultModelsOutput ?? rpcDir;
+
+      final modelsDirectory = Directory(modelsDir);
+      if (!await modelsDirectory.exists()) {
+        await modelsDirectory.create(recursive: true);
+      }
+
+      for (final entry in errorFiles.entries) {
+        final errorPath = p.join(modelsDir, entry.key);
+        await File(errorPath).writeAsString(entry.value);
+        print('✨ Generated: $errorPath');
+        generated++;
+      }
+    }
   }
 
   final generator = RpcGenerator();

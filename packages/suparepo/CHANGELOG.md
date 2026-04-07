@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.14.0] - 2026-04-08
+
+### Added
+
+- **Auto-generate error code sealed classes from PL/pgSQL** — For `RETURNS TABLE(success bool, error text)` functions, suparepo parses the function body to detect error code string literals (e.g. `'daily_limit_exceeded'`) and generates a Freezed sealed class with `fromErrorCode()` factory.
+- Result model `error` field is automatically typed with the generated error class instead of `String`.
+- Supported PL/pgSQL patterns:
+  - `return query select false, 'error_code'::text;`
+  - `error := 'error_code';`
+
 ## [1.13.2] - 2026-04-08
 
 ### Fixed

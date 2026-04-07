@@ -280,6 +280,66 @@ suparepo automatically detects the fields (`rank: text`, `upload_days: int4`, `i
 
 > **Note:** Requires `execute_sql` RPC function for `pg_proc.prosrc` access. If auto-detection fails or the function doesn't use `json_build_object`, use YAML-defined `result_models` as a fallback.
 
+### Error Code Sealed Class Generation
+
+For `RETURNS TABLE(success bool, error text)` functions, suparepo automatically detects error code string literals from the PL/pgSQL function body and generates a Freezed sealed class.
+
+**Example SQL:**
+
+```sql
+CREATE FUNCTION execute_exchange_atomic(p_mst_id int)
+RETURNS TABLE(success bool, error text) AS $$
+BEGIN
+  IF check_daily_limit() THEN
+    return query select false, 'daily_limit_exceeded'::text;
+  END IF;
+  IF check_balance() THEN
+    return query select false, 'insufficient_balance'::text;
+  END IF;
+  return query select true, ''::text;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Generated error class** (`execute_exchange_atomic_error.dart`):
+
+```dart
+@freezed
+sealed class ExecuteExchangeAtomicError
+    with _$ExecuteExchangeAtomicError {
+  const ExecuteExchangeAtomicError._();
+
+  const factory ExecuteExchangeAtomicError.dailyLimitExceeded()
+      = ExecuteExchangeAtomicErrorDailyLimitExceeded;
+  const factory ExecuteExchangeAtomicError.insufficientBalance()
+      = ExecuteExchangeAtomicErrorInsufficientBalance;
+  const factory ExecuteExchangeAtomicError.unknown({
+    required String code,
+  }) = ExecuteExchangeAtomicErrorUnknown;
+
+  factory ExecuteExchangeAtomicError.fromErrorCode(
+      String code) { ... }
+}
+```
+
+**Generated result model** uses the error type:
+
+```dart
+@freezed
+abstract class ExecuteExchangeAtomicResult ... {
+  const factory ExecuteExchangeAtomicResult({
+    required bool success,
+    required ExecuteExchangeAtomicError error,  // typed!
+  }) = _ExecuteExchangeAtomicResult;
+}
+```
+
+**Supported PL/pgSQL patterns:**
+- `return query select false, 'error_code'::text;`
+- `error := 'error_code';`
+
+> **Note:** Only functions with an `error text` (or `error_code text`) column in `RETURNS TABLE` are analyzed. Requires `execute_sql` RPC function.
+
 ### YAML-Defined Result Models (Manual Override)
 
 For functions where auto-detection doesn't work (e.g. no `json_build_object`, or you want to override the detected schema), you can define the column schema in `suparepo.yaml`:

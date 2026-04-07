@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.14.0 / supabase_schema_core 1.6.0] - 2026-04-08
+
+### Added
+
+- **suparepo**: Auto-generate Freezed sealed error classes from PL/pgSQL `RETURNS TABLE(success bool, error text)` functions
+- **supabase_schema_core**: `parseRpcErrorCodes()` for PL/pgSQL error code extraction
+
 ## [suparepo 1.13.2 / supabase_schema_core 1.5.2] - 2026-04-08
 
 ### Fixed

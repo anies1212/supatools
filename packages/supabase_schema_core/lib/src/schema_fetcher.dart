@@ -94,9 +94,19 @@ class RpcTableColumn {
   final String name;
   final String dataType;
 
+  /// For json/jsonb columns: nested column structure detected
+  /// from `json_build_object(...)` in the function body.
+  final List<RpcTableColumn>? nestedColumns;
+
+  /// True when wrapped in `json_agg(...)`, meaning the value
+  /// is a JSON array of objects rather than a single object.
+  final bool isArray;
+
   const RpcTableColumn({
     required this.name,
     required this.dataType,
+    this.nestedColumns,
+    this.isArray = false,
   });
 
   @override
@@ -396,6 +406,30 @@ class SchemaFetcher {
         }).toList();
       } catch (_) {
         // エラーコード自動検出の失敗は無視して続行
+      }
+
+      // RETURNS TABLE の json カラムのネスト構造を検出
+      try {
+        final nestedMap = await _fetchRpcNestedJsonColumns();
+        merged = merged.map((func) {
+          final nestedInfo = nestedMap[func.name];
+          if (nestedInfo == null) return func;
+          final cols = func.tableColumns;
+          if (cols == null) return func;
+          final updated = cols.map((col) {
+            final nested = nestedInfo[col.name];
+            if (nested == null) return col;
+            return RpcTableColumn(
+              name: col.name,
+              dataType: col.dataType,
+              nestedColumns: nested.columns,
+              isArray: nested.isArray,
+            );
+          }).toList();
+          return func.copyWith(tableColumns: updated);
+        }).toList();
+      } catch (_) {
+        // ネスト構造検出の失敗は無視して続行
       }
 
       return merged;
@@ -707,6 +741,134 @@ class SchemaFetcher {
 
     // Fallback
     return 'text';
+  }
+
+  /// Fetches nested JSON column structures from function bodies
+  /// for RETURNS TABLE functions with json/jsonb columns.
+  Future<
+          Map<String, Map<String, ({List<RpcTableColumn> columns, bool isArray})>>>
+      _fetchRpcNestedJsonColumns() async {
+    final query = '''
+      SELECT json_agg(sub) FROM (
+        SELECT
+          p.proname AS function_name,
+          p.prosrc AS source
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = '$schema'
+          AND p.proargmodes IS NOT NULL
+          AND 't' = ANY(p.proargmodes)
+          AND p.prosrc IS NOT NULL
+      ) sub
+    ''';
+
+    final response = await _executeRawQuery(query);
+    final result =
+        <String, Map<String, ({List<RpcTableColumn> columns, bool isArray})>>{};
+
+    final rows = response is List ? response : <dynamic>[];
+    for (final row in rows) {
+      final funcName = row['function_name'] as String;
+      final source = row['source'] as String;
+      final nested = parseNestedJsonColumns(source);
+      if (nested.isNotEmpty) {
+        result[funcName] = nested;
+      }
+    }
+
+    return result;
+  }
+
+  /// Parses PL/pgSQL source to find `json_agg(json_build_object(...))`
+  /// patterns and extract nested column structures.
+  ///
+  /// Returns a map of column alias → nested column info.
+  /// The alias is matched against RETURNS TABLE column names.
+  static Map<String, ({List<RpcTableColumn> columns, bool isArray})>
+      parseNestedJsonColumns(String source) {
+    final result =
+        <String, ({List<RpcTableColumn> columns, bool isArray})>{};
+
+    // Build variable types map for type resolution
+    final varTypes = _extractVariableTypes(source);
+
+    // Find json_agg(json_build_object(...)) patterns.
+    // We use a manual scan to handle nested parentheses correctly.
+    final aggStartPattern = RegExp(
+      r'jsonb?_agg\s*\(\s*jsonb?_build_object\s*\(',
+      caseSensitive: false,
+    );
+
+    for (final startMatch in aggStartPattern.allMatches(source)) {
+      // Find the matching closing paren for json_build_object(
+      final argsStart = startMatch.end;
+      var depth = 1;
+      var argsEnd = argsStart;
+      for (var i = argsStart; i < source.length; i++) {
+        if (source[i] == '(') depth++;
+        if (source[i] == ')') depth--;
+        if (depth == 0) {
+          argsEnd = i;
+          break;
+        }
+      }
+
+      final argsStr = source.substring(argsStart, argsEnd);
+      final columns = _parseBuildObjectColumns(argsStr, varTypes);
+      if (columns.isEmpty) continue;
+
+      // Look for "as alias" after the json_agg call
+      // (within 300 chars after the outer closing paren)
+      // Skip one more ')' for the json_agg closing paren
+      var scanPos = argsEnd + 1;
+      // Skip whitespace, ORDER BY, and the json_agg closing paren
+      while (scanPos < source.length &&
+          source[scanPos] != ')') {
+        scanPos++;
+      }
+      scanPos++; // skip json_agg ')'
+
+      final afterEnd = (scanPos + 300).clamp(0, source.length);
+      final afterMatch = source.substring(scanPos, afterEnd);
+      // Match "as alias" but NOT "as alias(" (which is a
+      // table alias like "as g(d)")
+      final aliasPattern = RegExp(
+        r'\bas\s+(\w+)(?!\s*\()',
+        caseSensitive: false,
+      );
+      final aliasMatch = aliasPattern.firstMatch(afterMatch);
+      final rawAlias = aliasMatch?.group(1);
+
+      // Use alias (stripped of v_ prefix) as key
+      final key = rawAlias != null
+          ? rawAlias.replaceFirst(RegExp(r'^v_'), '')
+          : columns.first.name;
+      result[key] = (columns: columns, isArray: true);
+    }
+
+    return result;
+  }
+
+  /// Parses json_build_object arguments into RpcTableColumn list.
+  static List<RpcTableColumn> _parseBuildObjectColumns(
+    String argsStr,
+    Map<String, String> varTypes,
+  ) {
+    final tokens = _tokenizeBuildObjectArgs(argsStr);
+    if (tokens.length < 2) return [];
+
+    final columns = <RpcTableColumn>[];
+    for (var i = 0; i + 1 < tokens.length; i += 2) {
+      final key = tokens[i];
+      final valueExpr = tokens[i + 1].trim();
+      final dataType = _resolveType(valueExpr, varTypes);
+      columns.add(RpcTableColumn(
+        name: key,
+        dataType: dataType,
+      ));
+    }
+
+    return columns;
   }
 
   /// Fetches error codes from PL/pgSQL function bodies for functions

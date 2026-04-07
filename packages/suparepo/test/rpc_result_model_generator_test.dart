@@ -568,4 +568,120 @@ void main() {
       );
     });
   });
+
+  group('nested json column model generation', () {
+    test('json_agg カラムが List<NestedModel> になる', () {
+      final func = RpcFunctionInfo(
+        name: 'get_membership_rank_detail',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'rank', dataType: 'text'),
+          RpcTableColumn(
+            name: 'calendar',
+            dataType: 'json',
+            isArray: true,
+            nestedColumns: [
+              RpcTableColumn(
+                name: 'date',
+                dataType: 'date',
+              ),
+              RpcTableColumn(
+                name: 'uploaded',
+                dataType: 'bool',
+              ),
+            ],
+          ),
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      // フィールド型は List<NestedModel>
+      expect(
+        output,
+        contains(
+          'required List<'
+          'GetMembershipRankDetailResultCalendarItem>'
+          ' calendar,',
+        ),
+      );
+      // fromRow で List<dynamic> をマッピング
+      expect(
+        output,
+        contains(
+          "(row['calendar'] as List<dynamic>)",
+        ),
+      );
+      expect(
+        output,
+        contains(
+          'GetMembershipRankDetailResultCalendarItem'
+          '.fromRow(',
+        ),
+      );
+      // ネストモデルクラスが同じファイルに生成
+      expect(
+        output,
+        contains(
+          'abstract class '
+          'GetMembershipRankDetailResultCalendarItem',
+        ),
+      );
+      expect(
+        output,
+        contains('required DateTime date,'),
+      );
+      expect(
+        output,
+        contains('required bool uploaded,'),
+      );
+      // ネストモデルの fromRow
+      expect(
+        output,
+        contains(
+          "date: DateTime.parse("
+          "row['date'] as String),",
+        ),
+      );
+      expect(
+        output,
+        contains(
+          "uploaded: row['uploaded'] as bool,",
+        ),
+      );
+      // 通常カラムは影響なし
+      expect(
+        output,
+        contains('required String rank,'),
+      );
+    });
+
+    test('nestedColumns なしの json は dynamic のまま', () {
+      final func = RpcFunctionInfo(
+        name: 'get_data',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(
+            name: 'metadata',
+            dataType: 'json',
+          ),
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      expect(
+        output,
+        contains('required dynamic metadata,'),
+      );
+      expect(
+        output,
+        isNot(contains('Item')),
+      );
+    });
+  });
 }

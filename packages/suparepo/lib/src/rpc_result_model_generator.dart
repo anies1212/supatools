@@ -73,11 +73,20 @@ class RpcResultModelGenerator {
       final fieldName = ReCase(col.name).camelCase;
       final isErrorCol = hasErrorType &&
           (col.name == 'error' || col.name == 'error_code');
-      final dartType = isErrorCol
-          ? errClassName!
-          : TypeMapper.isJsonType(col.dataType)
-              ? 'dynamic'
-              : TypeMapper.mapType(col.dataType);
+      final hasNested = col.nestedColumns != null &&
+          col.nestedColumns!.isNotEmpty;
+      final String dartType;
+      if (isErrorCol) {
+        dartType = errClassName!;
+      } else if (hasNested) {
+        final nestedName = _nestedClassName(className, col.name);
+        dartType =
+            col.isArray ? 'List<$nestedName>' : nestedName;
+      } else if (TypeMapper.isJsonType(col.dataType)) {
+        dartType = 'dynamic';
+      } else {
+        dartType = TypeMapper.mapType(col.dataType);
+      }
       buffer.writeln('    required $dartType $fieldName,');
     }
 
@@ -96,25 +105,115 @@ class RpcResultModelGenerator {
       final isErrorCol = hasErrorType &&
           (col.name == 'error' || col.name == 'error_code');
       final isJson = TypeMapper.isJsonType(col.dataType);
-      final dartType = isErrorCol
-          ? errClassName!
-          : isJson
-              ? 'dynamic'
-              : TypeMapper.mapType(col.dataType);
+      final hasNested = col.nestedColumns != null &&
+          col.nestedColumns!.isNotEmpty;
       if (isErrorCol) {
         buffer.writeln(
           "        $fieldName: "
           "$errClassName.fromErrorCode("
           "row['${col.name}'] as String),",
         );
-      } else if (dartType == 'DateTime') {
-        buffer.writeln(
-          "        $fieldName: "
-          "DateTime.parse(row['${col.name}'] as String),",
-        );
+      } else if (hasNested) {
+        final nestedName = _nestedClassName(className, col.name);
+        if (col.isArray) {
+          buffer.writeln(
+            "        $fieldName: "
+            "(row['${col.name}'] as List<dynamic>)",
+          );
+          buffer.writeln(
+            "            .map((e) => $nestedName.fromRow("
+            "e as Map<String, dynamic>))",
+          );
+          buffer.writeln('            .toList(),');
+        } else {
+          buffer.writeln(
+            "        $fieldName: $nestedName.fromRow("
+            "row['${col.name}'] as Map<String, dynamic>),",
+          );
+        }
       } else if (isJson) {
         buffer.writeln(
           "        $fieldName: row['${col.name}'],",
+        );
+      } else {
+        final dartType = TypeMapper.mapType(col.dataType);
+        if (dartType == 'DateTime') {
+          buffer.writeln(
+            "        $fieldName: "
+            "DateTime.parse(row['${col.name}'] as String),",
+          );
+        } else {
+          buffer.writeln(
+            "        $fieldName: row['${col.name}'] as $dartType,",
+          );
+        }
+      }
+    }
+
+    buffer.writeln('      );');
+    buffer.writeln('}');
+
+    // Generate nested model classes in the same file
+    for (final col in columns) {
+      if (col.nestedColumns == null ||
+          col.nestedColumns!.isEmpty) {
+        continue;
+      }
+      buffer.writeln();
+      _generateNestedClass(
+        buffer,
+        _nestedClassName(className, col.name),
+        col.nestedColumns!,
+      );
+    }
+
+    return buffer.toString();
+  }
+
+  /// Returns the class name for a nested json column model.
+  static String _nestedClassName(
+    String parentClass,
+    String columnName,
+  ) {
+    return '$parentClass${ReCase(columnName).pascalCase}Item';
+  }
+
+  /// Generates a nested Freezed class for a json column.
+  void _generateNestedClass(
+    StringBuffer buffer,
+    String className,
+    List<RpcTableColumn> columns,
+  ) {
+    buffer.writeln('/// Nested model for json column.');
+    buffer.writeln('@freezed');
+    buffer.writeln(
+      'abstract class $className with _\$$className {',
+    );
+    buffer.writeln('  const factory $className({');
+
+    for (final col in columns) {
+      final fieldName = ReCase(col.name).camelCase;
+      final dartType = TypeMapper.mapType(col.dataType);
+      buffer.writeln('    required $dartType $fieldName,');
+    }
+
+    buffer.writeln('  }) = _$className;');
+    buffer.writeln();
+
+    // fromRow factory
+    buffer.writeln(
+      '  factory $className.fromRow('
+      'Map<String, dynamic> row) =>',
+    );
+    buffer.writeln('      $className(');
+
+    for (final col in columns) {
+      final fieldName = ReCase(col.name).camelCase;
+      final dartType = TypeMapper.mapType(col.dataType);
+      if (dartType == 'DateTime') {
+        buffer.writeln(
+          "        $fieldName: "
+          "DateTime.parse(row['${col.name}'] as String),",
         );
       } else {
         buffer.writeln(
@@ -125,8 +224,6 @@ class RpcResultModelGenerator {
 
     buffer.writeln('      );');
     buffer.writeln('}');
-
-    return buffer.toString();
   }
 
   /// Generates all result model files for the given functions.

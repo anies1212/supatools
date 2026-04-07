@@ -843,6 +843,71 @@ END;
       expect(codes, hasLength(1));
     });
   });
+
+  group('parseNestedJsonColumns', () {
+    test('json_agg(json_build_object(...)) as alias', () {
+      final source = '''
+BEGIN
+  return query
+  select
+    (select json_agg(
+      json_build_object(
+        'date', g.d::date,
+        'uploaded', g.flag::bool
+      )
+    ) from generate_series(1,7) as g(d,flag)
+    ) as v_calendar
+  from computed;
+END;
+''';
+
+      final result =
+          SchemaFetcher.parseNestedJsonColumns(source);
+
+      expect(result, contains('calendar'));
+      final info = result['calendar']!;
+      expect(info.isArray, isTrue);
+      expect(info.columns, hasLength(2));
+      expect(info.columns[0].name, 'date');
+      expect(info.columns[0].dataType, 'date');
+      expect(info.columns[1].name, 'uploaded');
+    });
+
+    test('json_agg パターンなしは空マップ', () {
+      final source = '''
+BEGIN
+  return query select 1;
+END;
+''';
+
+      final result =
+          SchemaFetcher.parseNestedJsonColumns(source);
+      expect(result, isEmpty);
+    });
+
+    test('jsonb_agg(jsonb_build_object(...))', () {
+      final source = '''
+BEGIN
+  select jsonb_agg(
+    jsonb_build_object('id', v.id::int4, 'name', v.name::text)
+  ) as v_items
+  from vals v;
+END;
+''';
+
+      final result =
+          SchemaFetcher.parseNestedJsonColumns(source);
+
+      expect(result, contains('items'));
+      final info = result['items']!;
+      expect(info.isArray, isTrue);
+      expect(info.columns, hasLength(2));
+      expect(info.columns[0].name, 'id');
+      expect(info.columns[0].dataType, 'int4');
+      expect(info.columns[1].name, 'name');
+      expect(info.columns[1].dataType, 'text');
+    });
+  });
 }
 
 Map<String, dynamic> _buildSpec(Map<String, dynamic> paths) {

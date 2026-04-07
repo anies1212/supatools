@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0] - 2026-04-08
+
+### Added
+
+- `RpcTableColumn.nestedColumns` and `isArray` fields for nested JSON structure
+- `SchemaFetcher.parseNestedJsonColumns()` — parses `json_agg(json_build_object(...))` patterns to extract nested column schemas with alias matching
+- `SchemaFetcher._fetchRpcNestedJsonColumns()` — auto-detects nested structures for RETURNS TABLE json columns
+
 ## [1.6.0] - 2026-04-08
 
 ### Added

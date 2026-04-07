@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.15.0] - 2026-04-08
+
+### Added
+
+- **Auto-generate nested Freezed models for json columns in `RETURNS TABLE`** — When a `RETURNS TABLE` function has `json`/`jsonb` columns, suparepo parses `json_agg(json_build_object(...))` patterns in the function body to detect the inner structure and generates typed nested models (e.g. `List<CalendarItem>` instead of `dynamic`).
+- Nested models are generated in the same result file with `fromRow()` factory
+- Supports multiple json columns per function, each with independent nested structure detection
+- Column alias matching: `json_agg(...) as v_calendar` maps to `calendar` column in `RETURNS TABLE`
+
 ## [1.14.0] - 2026-04-08
 
 ### Added

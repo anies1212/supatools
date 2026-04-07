@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.13.0] - 2026-04-08
+
+### Added
+
+- **Auto-detect JSON column schemas** — For `RETURNS json/jsonb` RPC functions, suparepo now automatically parses `json_build_object()` / `jsonb_build_object()` calls in the function body to detect field names and types, then generates Freezed result models without any YAML configuration.
+  - Types are inferred from PL/pgSQL variable declarations (`DECLARE v_rank text;`)
+  - Type cast expressions (`expr::int4`) are also recognized
+  - `RETURNS TABLE` auto-detection takes precedence; JSON auto-detection only applies to functions without existing `tableColumns`
+  - Requires `execute_sql` RPC function for `pg_proc.prosrc` access
+
 ## [1.12.0] - 2026-04-08
 
 ### Added

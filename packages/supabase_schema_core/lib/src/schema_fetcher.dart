@@ -355,6 +355,22 @@ class SchemaFetcher {
         // TABLE列情報の取得に失敗しても続行
       }
 
+      // json_build_object 自動検出 (tableColumns未設定の関数のみ)
+      try {
+        final jsonColumnsMap = await _fetchRpcJsonColumns();
+        merged = merged.map((func) {
+          if (func.tableColumns != null &&
+              func.tableColumns!.isNotEmpty) {
+            return func;
+          }
+          final columns = jsonColumnsMap[func.name];
+          if (columns == null) return func;
+          return func.copyWith(tableColumns: columns);
+        }).toList();
+      } catch (_) {
+        // JSON列自動検出の失敗は無視して続行
+      }
+
       return merged;
     } catch (_) {
       return functions;
@@ -477,6 +493,236 @@ class SchemaFetcher {
 
     return result;
   }
+
+  /// Fetches column info for `RETURNS json/jsonb` functions by
+  /// parsing `json_build_object` / `jsonb_build_object` calls
+  /// in the function body (`pg_proc.prosrc`).
+  Future<Map<String, List<RpcTableColumn>>>
+      _fetchRpcJsonColumns() async {
+    final query = '''
+      SELECT json_agg(sub) FROM (
+        SELECT
+          p.proname AS function_name,
+          p.prosrc AS source
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        JOIN pg_type t ON p.prorettype = t.oid
+        WHERE n.nspname = '$schema'
+          AND t.typname IN ('json', 'jsonb')
+          AND p.prosrc IS NOT NULL
+      ) sub
+    ''';
+
+    final response = await _executeRawQuery(query);
+    final result = <String, List<RpcTableColumn>>{};
+
+    final rows = response is List ? response : <dynamic>[];
+    for (final row in rows) {
+      final funcName = row['function_name'] as String;
+      final source = row['source'] as String;
+      final columns = parseJsonBuildObject(source);
+      if (columns.isNotEmpty) {
+        result[funcName] = columns;
+      }
+    }
+
+    return result;
+  }
+
+  /// Parses `json_build_object` / `jsonb_build_object` calls from
+  /// PL/pgSQL function source and extracts column definitions.
+  ///
+  /// Infers types from variable declarations (`DECLARE v_foo type;`)
+  /// or parameter declarations in the function signature.
+  static List<RpcTableColumn> parseJsonBuildObject(String source) {
+    // Find json_build_object(...) or jsonb_build_object(...)
+    final buildObjPattern = RegExp(
+      r'jsonb?_build_object\s*\(([\s\S]*?)\)\s*;',
+      caseSensitive: false,
+    );
+    final match = buildObjPattern.firstMatch(source);
+    if (match == null) return [];
+
+    final argsStr = match.group(1)!;
+
+    // Extract key-value pairs: 'key', expression, 'key', expression, ...
+    final tokens = _tokenizeBuildObjectArgs(argsStr);
+    if (tokens.length < 2) return [];
+
+    // Build variable → type map from DECLARE section and params
+    final varTypes = _extractVariableTypes(source);
+
+    final columns = <RpcTableColumn>[];
+    for (var i = 0; i + 1 < tokens.length; i += 2) {
+      final key = tokens[i];
+      final valueExpr = tokens[i + 1].trim();
+
+      // Try to resolve type from variable declarations
+      final dataType = _resolveType(valueExpr, varTypes);
+      columns.add(RpcTableColumn(
+        name: key,
+        dataType: dataType,
+      ));
+    }
+
+    return columns;
+  }
+
+  /// Tokenizes the arguments of json_build_object(...) into
+  /// alternating key/value strings.
+  ///
+  /// Handles string literals ('key'), nested function calls,
+  /// and comma separation.
+  static List<String> _tokenizeBuildObjectArgs(String args) {
+    final tokens = <String>[];
+    var current = StringBuffer();
+    var depth = 0;
+    var inString = false;
+
+    for (var i = 0; i < args.length; i++) {
+      final ch = args[i];
+
+      if (ch == "'" && !inString) {
+        inString = true;
+        current = StringBuffer();
+        continue;
+      }
+      if (ch == "'" && inString) {
+        // Check for escaped quote ''
+        if (i + 1 < args.length && args[i + 1] == "'") {
+          current.write("'");
+          i++;
+          continue;
+        }
+        inString = false;
+        tokens.add(current.toString());
+        current = StringBuffer();
+        continue;
+      }
+      if (inString) {
+        current.write(ch);
+        continue;
+      }
+
+      if (ch == '(') depth++;
+      if (ch == ')') depth--;
+
+      if (ch == ',' && depth == 0) {
+        final value = current.toString().trim();
+        if (value.isNotEmpty) {
+          tokens.add(value);
+        }
+        current = StringBuffer();
+        continue;
+      }
+
+      current.write(ch);
+    }
+
+    final remaining = current.toString().trim();
+    if (remaining.isNotEmpty) {
+      tokens.add(remaining);
+    }
+
+    return tokens;
+  }
+
+  /// Extracts variable name → type mappings from PL/pgSQL source.
+  ///
+  /// Parses both DECLARE blocks and function parameter declarations.
+  static Map<String, String> _extractVariableTypes(String source) {
+    final types = <String, String>{};
+
+    // DECLARE section: v_name type; or v_name type := ...;
+    final declarePattern = RegExp(
+      r'(\w+)\s+([\w\[\]]+)(?:\s*(?::=|;|DEFAULT))',
+      caseSensitive: false,
+    );
+    for (final m in declarePattern.allMatches(source)) {
+      final varName = m.group(1)!.toLowerCase();
+      final typeName = m.group(2)!.toLowerCase();
+      // Skip PL/pgSQL keywords that look like declarations
+      if (_plpgsqlKeywords.contains(varName)) continue;
+      types[varName] = typeName;
+    }
+
+    return types;
+  }
+
+  /// Resolves a value expression to a PostgreSQL type name.
+  ///
+  /// First tries direct variable lookup, then falls back to
+  /// common expression patterns.
+  static String _resolveType(
+    String expr,
+    Map<String, String> varTypes,
+  ) {
+    final normalized = expr.trim().toLowerCase();
+
+    // Direct variable reference
+    final varType = varTypes[normalized];
+    if (varType != null) return varType;
+
+    // Common patterns
+    if (normalized == 'true' || normalized == 'false') {
+      return 'bool';
+    }
+    if (RegExp(r'^\d+$').hasMatch(normalized)) return 'int4';
+    if (RegExp(r'^\d+\.\d+$').hasMatch(normalized)) {
+      return 'float8';
+    }
+    if (normalized.startsWith("'")) return 'text';
+    if (normalized.contains('::')) {
+      // Type cast: expr::type
+      final castType = normalized.split('::').last.trim();
+      return castType;
+    }
+
+    // Fallback
+    return 'text';
+  }
+
+  static const _plpgsqlKeywords = {
+    'declare',
+    'begin',
+    'end',
+    'if',
+    'then',
+    'else',
+    'elsif',
+    'loop',
+    'while',
+    'for',
+    'return',
+    'raise',
+    'perform',
+    'execute',
+    'into',
+    'select',
+    'insert',
+    'update',
+    'delete',
+    'from',
+    'where',
+    'and',
+    'or',
+    'not',
+    'in',
+    'is',
+    'null',
+    'exception',
+    'when',
+    'others',
+    'found',
+    'strict',
+    'query',
+    'notice',
+    'warning',
+    'exit',
+    'continue',
+    'case',
+    'using',
+  };
 
   /// Merges TABLE column info into [RpcFunctionInfo] list.
   ///

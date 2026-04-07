@@ -611,6 +611,146 @@ void main() {
       expect(result[0].tableColumns, hasLength(1));
     });
   });
+
+  group('parseJsonBuildObject', () {
+    test('basic json_build_object with variable types', () {
+      final source = '''
+DECLARE
+  v_rank text;
+  v_upload_days int4;
+  v_is_active bool;
+BEGIN
+  RETURN json_build_object(
+    'rank', v_rank,
+    'upload_days', v_upload_days,
+    'is_active', v_is_active
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(3));
+      expect(columns[0].name, 'rank');
+      expect(columns[0].dataType, 'text');
+      expect(columns[1].name, 'upload_days');
+      expect(columns[1].dataType, 'int4');
+      expect(columns[2].name, 'is_active');
+      expect(columns[2].dataType, 'bool');
+    });
+
+    test('jsonb_build_object also supported', () {
+      final source = '''
+DECLARE
+  v_total int4;
+  v_name text;
+BEGIN
+  RETURN jsonb_build_object('total', v_total, 'name', v_name);
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(2));
+      expect(columns[0].name, 'total');
+      expect(columns[0].dataType, 'int4');
+      expect(columns[1].name, 'name');
+      expect(columns[1].dataType, 'text');
+    });
+
+    test('type cast expressions', () {
+      final source = '''
+BEGIN
+  RETURN json_build_object(
+    'count', some_expr::int4,
+    'ratio', other_expr::float8
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(2));
+      expect(columns[0].name, 'count');
+      expect(columns[0].dataType, 'int4');
+      expect(columns[1].name, 'ratio');
+      expect(columns[1].dataType, 'float8');
+    });
+
+    test('nested function calls are handled', () {
+      final source = '''
+DECLARE
+  v_rank text;
+BEGIN
+  RETURN json_build_object(
+    'rank', v_rank,
+    'created_at', now()
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(2));
+      expect(columns[0].name, 'rank');
+      expect(columns[0].dataType, 'text');
+      // now() falls back to text since no variable match
+      expect(columns[1].name, 'created_at');
+      expect(columns[1].dataType, 'text');
+    });
+
+    test('array types in declarations', () {
+      final source = '''
+DECLARE
+  v_flags boolean[];
+  v_scores int4[];
+BEGIN
+  RETURN json_build_object(
+    'flags', v_flags,
+    'scores', v_scores
+  );
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(2));
+      expect(columns[0].name, 'flags');
+      expect(columns[0].dataType, 'boolean[]');
+      expect(columns[1].name, 'scores');
+      expect(columns[1].dataType, 'int4[]');
+    });
+
+    test('no json_build_object returns empty', () {
+      final source = '''
+BEGIN
+  RETURN query_result;
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+      expect(columns, isEmpty);
+    });
+
+    test('variable with DEFAULT assignment', () {
+      final source = '''
+DECLARE
+  v_count int4 DEFAULT 0;
+  v_label text := 'default';
+BEGIN
+  RETURN json_build_object('count', v_count, 'label', v_label);
+END;
+''';
+
+      final columns = SchemaFetcher.parseJsonBuildObject(source);
+
+      expect(columns, hasLength(2));
+      expect(columns[0].name, 'count');
+      expect(columns[0].dataType, 'int4');
+      expect(columns[1].name, 'label');
+      expect(columns[1].dataType, 'text');
+    });
+  });
 }
 
 Map<String, dynamic> _buildSpec(Map<String, dynamic> paths) {

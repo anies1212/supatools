@@ -239,9 +239,50 @@ Future<List<GetMyInviteCodeResult>> getMyInviteCode({
 
 > **Note:** Run `build_runner` after generation to create the `.freezed.dart` part files. Requires `execute_sql` RPC function for TABLE column detection.
 
-### YAML-Defined Result Models (`RETURNS json/jsonb`)
+### Automatic JSON Schema Detection (`RETURNS json/jsonb`)
 
-For functions that use `RETURNS json` or `RETURNS jsonb` instead of `RETURNS TABLE(...)`, you can define the column schema in `suparepo.yaml` to generate Freezed result models:
+For functions that use `RETURNS json` or `RETURNS jsonb`, suparepo automatically parses `json_build_object()` / `jsonb_build_object()` calls in the function body to detect field names and infer types from variable declarations.
+
+**No configuration needed** — just enable `generate_result_models`:
+
+```yaml
+rpc:
+  enabled: true
+  generate_result_models: true
+```
+
+**Example:** For a SQL function:
+
+```sql
+CREATE FUNCTION get_membership_rank_info(p_user_id uuid)
+RETURNS json AS $$
+DECLARE
+  v_rank text;
+  v_upload_days int4;
+  v_is_active bool;
+BEGIN
+  -- ... logic ...
+  RETURN json_build_object(
+    'rank', v_rank,
+    'upload_days', v_upload_days,
+    'is_active', v_is_active
+  );
+END;
+$$ LANGUAGE plpgsql;
+```
+
+suparepo automatically detects the fields (`rank: text`, `upload_days: int4`, `is_active: bool`) and generates the same Freezed model as `RETURNS TABLE` functions.
+
+**Supported patterns:**
+- Variable references with DECLARE types: `'key', v_variable`
+- Type cast expressions: `'key', expr::int4`
+- `json_build_object()` and `jsonb_build_object()`
+
+> **Note:** Requires `execute_sql` RPC function for `pg_proc.prosrc` access. If auto-detection fails or the function doesn't use `json_build_object`, use YAML-defined `result_models` as a fallback.
+
+### YAML-Defined Result Models (Manual Override)
+
+For functions where auto-detection doesn't work (e.g. no `json_build_object`, or you want to override the detected schema), you can define the column schema in `suparepo.yaml`:
 
 ```yaml
 rpc:

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0] - 2026-04-08
+
+### Added
+
+- Auto-detect JSON column schemas from `json_build_object()` / `jsonb_build_object()` in PL/pgSQL function bodies via `pg_proc.prosrc`
+- `SchemaFetcher.parseJsonBuildObject()` — parses function source to extract key names and infer types from variable declarations
+- `SchemaFetcher._fetchRpcJsonColumns()` — queries `pg_proc` for `RETURNS json/jsonb` functions and auto-detects column schemas
+
 ## [1.4.2] - 2026-04-03
 
 ### Added

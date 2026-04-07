@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.13.0 / supabase_schema_core 1.5.0] - 2026-04-08
+
+### Added
+
+- **suparepo**: Auto-detect JSON column schemas from `json_build_object()` in PL/pgSQL function bodies — no YAML configuration needed
+- **supabase_schema_core**: `parseJsonBuildObject()` parser for `pg_proc.prosrc` source analysis
+
 ## [suparepo 1.12.0] - 2026-04-08
 
 ### Added

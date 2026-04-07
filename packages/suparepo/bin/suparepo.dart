@@ -287,7 +287,7 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
   }
 
   // Apply filters (execute_sql is internal infrastructure, always exclude)
-  final filtered = functions
+  var filtered = functions
       .where((f) =>
           f.name != 'execute_sql' && config.rpc.shouldIncludeFunction(f.name))
       .toList();
@@ -301,6 +301,20 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     '📋 Found ${filtered.length} RPC function(s): '
     '${filtered.map((f) => f.name).join(', ')}',
   );
+
+  // Merge YAML result_models into tableColumns
+  final resultModels = config.rpc.resultModels;
+  if (resultModels != null) {
+    filtered = filtered.map((func) {
+      final columns = resultModels[func.name];
+      if (columns == null) return func;
+      return func.copyWith(tableColumns: columns);
+    }).toList();
+    print(
+      '📝 Applied result_models: '
+      '${resultModels.keys.join(', ')}',
+    );
+  }
 
   var generated = 0;
 

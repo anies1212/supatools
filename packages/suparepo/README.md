@@ -239,6 +239,78 @@ Future<List<GetMyInviteCodeResult>> getMyInviteCode({
 
 > **Note:** Run `build_runner` after generation to create the `.freezed.dart` part files. Requires `execute_sql` RPC function for TABLE column detection.
 
+### YAML-Defined Result Models (`RETURNS json/jsonb`)
+
+For functions that use `RETURNS json` or `RETURNS jsonb` instead of `RETURNS TABLE(...)`, you can define the column schema in `suparepo.yaml` to generate Freezed result models:
+
+```yaml
+rpc:
+  enabled: true
+  generate_result_models: true
+  result_models:
+    get_membership_rank_info:
+      rank: { type: text }
+      upload_days: { type: int4 }
+      is_active: { type: bool }
+    get_user_profile:
+      name: text          # shorthand syntax
+      avatar_url: text
+```
+
+**Example:** For a SQL function:
+
+```sql
+CREATE FUNCTION get_membership_rank_info(p_user_id uuid)
+RETURNS json AS $$
+BEGIN
+  RETURN json_build_object(
+    'rank', v_rank,
+    'upload_days', v_upload_days,
+    'is_active', v_is_active
+  );
+END;
+$$ LANGUAGE plpgsql;
+```
+
+suparepo generates:
+
+```dart
+// get_membership_rank_info_result.dart
+@freezed
+abstract class GetMembershipRankInfoResult
+    with _$GetMembershipRankInfoResult {
+  const factory GetMembershipRankInfoResult({
+    required String rank,
+    required int uploadDays,
+    required bool isActive,
+  }) = _GetMembershipRankInfoResult;
+
+  factory GetMembershipRankInfoResult.fromRow(
+    Map<String, dynamic> row,
+  ) => GetMembershipRankInfoResult(
+    rank: row['rank'] as String,
+    uploadDays: row['upload_days'] as int,
+    isActive: row['is_active'] as bool,
+  );
+}
+```
+
+And the RPC client returns a single typed object:
+
+```dart
+Future<GetMembershipRankInfoResult> getMembershipRankInfo({
+  required String pUserId,
+}) async {
+  final response = await _client.rpc<Map<String, dynamic>>(
+    'get_membership_rank_info',
+    params: {'p_user_id': pUserId},
+  );
+  return GetMembershipRankInfoResult.fromRow(response);
+}
+```
+
+> **Note:** YAML `result_models` definitions take precedence over auto-detected `RETURNS TABLE` columns, allowing you to override the schema if needed.
+
 ## Edge Function Client Generation
 
 Generates client code for your Supabase Edge Functions by scanning the local `supabase/functions/` directory.
@@ -583,6 +655,11 @@ rpc:
     get_items: setof jsonb
   generate_result_models: true  # Generate Freezed result models for RETURNS TABLE functions (default: false)
   result_models_output: lib/models/rpc  # Custom output directory for result models (optional)
+  result_models:                # YAML-defined schemas for RETURNS json/jsonb functions
+    get_membership_rank_info:
+      rank: { type: text }
+      upload_days: { type: int4 }
+      is_active: { type: bool }
 
 # Edge Function client
 edge_functions:

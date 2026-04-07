@@ -63,7 +63,46 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       returnTypes: _parseReturnTypes(value['return_types']),
       generateResultModels: value['generate_result_models'] == true,
       resultModelsOutput: value['result_models_output']?.toString(),
+      resultModels: _parseResultModels(value['result_models']),
     );
+  }
+
+  /// Parses `result_models` YAML section into column definitions.
+  ///
+  /// ```yaml
+  /// result_models:
+  ///   get_membership_rank_info:
+  ///     rank: { type: text }
+  ///     upload_days: { type: int4 }
+  /// ```
+  Map<String, List<RpcTableColumn>>? _parseResultModels(dynamic value) {
+    if (value == null || value is! YamlMap) return null;
+
+    final result = <String, List<RpcTableColumn>>{};
+    for (final entry in value.entries) {
+      final funcName = entry.key.toString();
+      final fieldsDef = entry.value;
+      if (fieldsDef == null || fieldsDef is! YamlMap) continue;
+
+      final columns = <RpcTableColumn>[];
+      for (final field in fieldsDef.entries) {
+        final fieldName = field.key.toString();
+        final fieldDef = field.value;
+        final dataType = fieldDef is YamlMap
+            ? (fieldDef['type']?.toString() ?? 'text')
+            : fieldDef?.toString() ?? 'text';
+        columns.add(RpcTableColumn(
+          name: fieldName,
+          dataType: dataType,
+        ));
+      }
+
+      if (columns.isNotEmpty) {
+        result[funcName] = columns;
+      }
+    }
+
+    return result.isEmpty ? null : result;
   }
 
   Map<String, String>? _parseReturnTypes(dynamic value) {
@@ -147,12 +186,17 @@ class RpcConfig {
   final Map<String, String>? returnTypes;
 
   /// When true, generates Freezed result model classes for
-  /// RETURNS TABLE functions.
+  /// RETURNS TABLE functions and YAML-defined result_models.
   final bool generateResultModels;
 
   /// Output directory for result model files.
   /// If null, models are written next to the RPC client file.
   final String? resultModelsOutput;
+
+  /// YAML-defined column schemas for functions that return json/jsonb.
+  /// Maps function name → list of column definitions.
+  /// These are merged into `RpcFunctionInfo.tableColumns` during generation.
+  final Map<String, List<RpcTableColumn>>? resultModels;
 
   const RpcConfig({
     this.enabled = false,
@@ -162,6 +206,7 @@ class RpcConfig {
     this.returnTypes,
     this.generateResultModels = false,
     this.resultModelsOutput,
+    this.resultModels,
   });
 
   /// Checks if a function should be included

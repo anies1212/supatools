@@ -232,6 +232,88 @@ rpc:
       );
     });
 
+    test('RPC result_modelsのパース', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+  generate_result_models: true
+  result_models:
+    get_membership_rank_info:
+      rank: { type: text }
+      upload_days: { type: int4 }
+      is_active: { type: bool }
+    get_user_profile:
+      name: { type: text }
+      avatar_url: { type: text }
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      expect(config!.rpc.resultModels, isNotNull);
+      final models = config.rpc.resultModels!;
+      expect(models, hasLength(2));
+
+      final rankInfo = models['get_membership_rank_info']!;
+      expect(rankInfo, hasLength(3));
+      expect(rankInfo[0].name, 'rank');
+      expect(rankInfo[0].dataType, 'text');
+      expect(rankInfo[1].name, 'upload_days');
+      expect(rankInfo[1].dataType, 'int4');
+      expect(rankInfo[2].name, 'is_active');
+      expect(rankInfo[2].dataType, 'bool');
+
+      final profile = models['get_user_profile']!;
+      expect(profile, hasLength(2));
+      expect(profile[0].name, 'name');
+      expect(profile[1].name, 'avatar_url');
+    });
+
+    test('RPC result_models未指定はnull', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      expect(config!.rpc.resultModels, isNull);
+    });
+
+    test('RPC result_models shorthand記法', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+  result_models:
+    get_stats:
+      total: int4
+      name: text
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      final models = config!.rpc.resultModels!;
+      final stats = models['get_stats']!;
+      expect(stats[0].name, 'total');
+      expect(stats[0].dataType, 'int4');
+      expect(stats[1].name, 'name');
+      expect(stats[1].dataType, 'text');
+    });
+
     test('generate_result_modelsデフォルトはfalse', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co

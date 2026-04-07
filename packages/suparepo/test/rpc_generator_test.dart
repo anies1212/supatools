@@ -757,5 +757,133 @@ void main() {
         ),
       );
     });
+    test('returns json + YAML result_models → 単一モデル返却', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_membership_rank_info',
+          params: [
+            RpcParamInfo(
+              name: 'user_id',
+              dataType: 'uuid',
+              isRequired: true,
+            ),
+          ],
+          returnType: 'json',
+          returnsSetOf: false,
+          tableColumns: [
+            RpcTableColumn(name: 'rank', dataType: 'text'),
+            RpcTableColumn(
+              name: 'upload_days',
+              dataType: 'int4',
+            ),
+            RpcTableColumn(
+              name: 'is_active',
+              dataType: 'bool',
+            ),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      // 単一オブジェクト返却 (not List)
+      expect(
+        output,
+        contains(
+          'Future<GetMembershipRankInfoResult> '
+          'getMembershipRankInfo',
+        ),
+      );
+      // rpc<Map<String, dynamic>> で呼び出し
+      expect(
+        output,
+        contains("rpc<Map<String, dynamic>>"),
+      );
+      // fromRow で直接変換 (not .map().toList())
+      expect(
+        output,
+        contains(
+          'GetMembershipRankInfoResult.fromRow(response)',
+        ),
+      );
+      expect(
+        output,
+        isNot(contains('.map(')),
+      );
+      // import
+      expect(
+        output,
+        contains(
+          "import 'get_membership_rank_info_result.dart'",
+        ),
+      );
+    });
+
+    test('returns json + result_models パラメータなし', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_app_config',
+          params: [],
+          returnType: 'json',
+          returnsSetOf: false,
+          tableColumns: [
+            RpcTableColumn(
+              name: 'version',
+              dataType: 'text',
+            ),
+            RpcTableColumn(
+              name: 'maintenance',
+              dataType: 'bool',
+            ),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      expect(
+        output,
+        contains('Future<GetAppConfigResult> getAppConfig()'),
+      );
+      expect(
+        output,
+        contains('GetAppConfigResult.fromRow(response)'),
+      );
+    });
+
+    test('setof json + result_models → List<Model>返却', () {
+      final functions = [
+        RpcFunctionInfo(
+          name: 'get_rankings',
+          params: [],
+          returnType: 'json',
+          returnsSetOf: true,
+          tableColumns: [
+            RpcTableColumn(name: 'rank', dataType: 'int4'),
+            RpcTableColumn(name: 'name', dataType: 'text'),
+          ],
+        ),
+      ];
+
+      final output = generator.generateRpcClient(
+        functions,
+        generateResultModels: true,
+      );
+
+      expect(
+        output,
+        contains('Future<List<GetRankingsResult>>'),
+      );
+      expect(
+        output,
+        contains('.map(GetRankingsResult.fromRow).toList()'),
+      );
+    });
   });
 }

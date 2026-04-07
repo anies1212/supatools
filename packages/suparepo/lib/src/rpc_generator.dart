@@ -197,13 +197,17 @@ class RpcGenerator {
 
     // Method body
     final isVoid = dartReturnType == 'void';
-    final isScalar = !isVoid && !func.returnsSetOf;
+    final singleModel = _hasSingleResultModel(func);
+    final isScalar = !isVoid && !func.returnsSetOf && !singleModel;
     final String prefix;
     final String typeArg;
 
     if (isVoid) {
       prefix = '    await';
       typeArg = 'void';
+    } else if (singleModel) {
+      prefix = '    final response = await';
+      typeArg = 'Map<String, dynamic>';
     } else if (isScalar) {
       prefix = '    return await';
       typeArg = dartReturnType;
@@ -257,12 +261,18 @@ class RpcGenerator {
 
     if (_hasResultModel(func)) {
       final className = RpcResultModelGenerator.resultClassName(func.name);
-      buffer.writeln(
-        '    return response.cast<Map<String, dynamic>>()',
-      );
-      buffer.writeln(
-        '        .map($className.fromRow).toList();',
-      );
+      if (_hasSingleResultModel(func)) {
+        buffer.writeln(
+          '    return $className.fromRow(response);',
+        );
+      } else {
+        buffer.writeln(
+          '    return response.cast<Map<String, dynamic>>()',
+        );
+        buffer.writeln(
+          '        .map($className.fromRow).toList();',
+        );
+      }
       return;
     }
 
@@ -278,12 +288,21 @@ class RpcGenerator {
       func.tableColumns != null &&
       func.tableColumns!.isNotEmpty;
 
+  /// Whether the function returns a single result model (not a list).
+  ///
+  /// True when the function has YAML-defined result_models columns
+  /// but does NOT use `RETURNS TABLE` (i.e. `returnsSetOf` is false).
+  /// Typically applies to `RETURNS json/jsonb` functions.
+  bool _hasSingleResultModel(RpcFunctionInfo func) =>
+      _hasResultModel(func) && !func.returnsSetOf;
+
   String _buildReturnType(RpcFunctionInfo func) {
     if (func.returnType == 'void') return 'void';
 
     if (_hasResultModel(func)) {
       final className = RpcResultModelGenerator.resultClassName(func.name);
-      return 'List<$className>';
+      if (func.returnsSetOf) return 'List<$className>';
+      return className;
     }
 
     final dartType = TypeMapper.mapType(func.returnType);

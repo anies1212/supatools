@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.12.0] - 2026-04-08
+
+### Added
+
+- **YAML-defined result models for `RETURNS json/jsonb` RPC functions** — You can now define column schemas in `suparepo.yaml` via `result_models` to generate Freezed result model classes for functions that return `json` or `jsonb`, without changing the SQL to `RETURNS TABLE(...)`.
+- Single-object return support: functions with `result_models` and `returnsSetOf: false` generate `Future<Model>` instead of `Future<List<Model>>`.
+- Shorthand syntax support in `result_models` (e.g. `rank: text` instead of `rank: { type: text }`).
+
+### Example
+
+```yaml
+rpc:
+  enabled: true
+  generate_result_models: true
+  result_models:
+    get_membership_rank_info:
+      rank: { type: text }
+      upload_days: { type: int4 }
+      is_active: { type: bool }
+```
+
+Generates `GetMembershipRankInfoResult` Freezed class and the RPC client returns `Future<GetMembershipRankInfoResult>` instead of `Future<Map<String, dynamic>>`.
+
 ## [1.11.5] - 2026-04-03
 
 ### Fixed

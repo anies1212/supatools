@@ -1,0 +1,24 @@
+name: supa_query_annotation
+description: >-
+  Dart annotations for declarative Supabase custom queries.
+  Used with suparepo for code generation.
+version: 0.1.0
+homepage: https://github.com/anies1212/supatools
+repository: https://github.com/anies1212/supatools/tree/main/packages/supa_query_annotation
+issue_tracker: https://github.com/anies1212/supatools/issues
+
+resolution: workspace
+
+topics:
+  - supabase
+  - annotation
+  - code-generation
+  - query-builder
+  - postgresql
+
+environment:
+  sdk: ^3.5.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.28.0

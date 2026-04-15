@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.16.0] - 2026-04-15
+
+### Added
+
+- **`@SupaQuery` annotation support** — Annotate method stubs in `.custom.dart` extension files with `@SupaQuery(...)` and suparepo auto-generates PostgREST query implementations. Supports:
+  - Filter operators: `eq`, `neq`, `lt`, `lte`, `gt`, `gte`, `like`, `ilike`, `is_`, `in_`, `contains`, `overlaps`
+  - `Param.now` for runtime `DateTime.now()` injection
+  - `Param('name')` for method parameter injection
+  - `OrderBy` / `OrderBy.desc` with `nullsFirst` option
+  - `limit`, `returnMode` (list/single/maybeSingle), custom `select`, `resultModel`
+- New dependency: `supa_query_annotation ^0.1.0`
+
+### Changed
+
+- Translate all code comments, doc strings, test descriptions, and CHANGELOG entries to English (OSS)
+
 ## [1.15.2] - 2026-04-08
 
 ### Fixed
@@ -98,66 +114,66 @@ Generates `GetMembershipRankInfoResult` Freezed class and the RPC client returns
 
 ### Fixed
 
-- `_isImportReferenced` で `.supafreeze.dart` のクラス名が `Repository`/`Custom` サフィックス付きの識別子に部分一致してしまうバグを修正
-  - 例: `TentameProjects` が `TentameProjectsRepository` に誤マッチし、未使用importが除去されなかった
+- Fix `_isImportReferenced` incorrectly matching `.supafreeze.dart` class names as substrings of identifiers with `Repository`/`Custom` suffixes
+  - e.g. `TentameProjects` falsely matched `TentameProjectsRepository`, preventing removal of unused imports
 
 ## [1.11.2] - 2026-03-11
 
 ### Fixed
 
-- `.custom.dart` ファイルの未使用 import（supabase, supafreeze）を自動クリーンアップする機能を追加
-- `generateExtensionFile()` でメソッドが実際に参照する型のみ import するよう改善
+- Add automatic cleanup of unused imports (supabase, supafreeze) in `.custom.dart` files
+- Improve `generateExtensionFile()` to only import types actually referenced by methods
 
 ## [1.11.1] - 2026-03-11
 
 ### Fixed
 
-- `.custom.dart` から埋め込み時に `.supafreeze.dart` import を除外漏れしていたバグを修正
-- 生成リポジトリファイルで custom import が既存 import と重複するバグを修正
+- Fix `.supafreeze.dart` imports not being excluded when embedding from `.custom.dart`
+- Fix duplicate custom imports in generated repository files
 
 ## [1.11.0] - 2026-03-11
 
 ### Changed
 
-- `.custom.dart` のカスタムメソッドを生成されるリポジトリクラスに**インスタンスメソッドとして埋め込む**方式に変更
-  - extension メソッドは Dart の静的ディスパッチにより、テストでサブクラスから override できない問題を解決
-  - `.custom.dart` ファイル自体は extension 形式のまま保持（IDE サポート・編集用）
-  - suparepo 実行時に `.custom.dart` を読み取り、生成クラスに直接埋め込む
-  - use_case 側で `.custom.dart` の import が不要に
-  - テストの fake リポジトリでカスタムメソッドを正常に override 可能
+- Embed custom methods from `.custom.dart` as **instance methods** in generated repository classes
+  - Resolves issue where extension methods could not be overridden from subclasses in tests due to Dart's static dispatch
+  - `.custom.dart` files remain in extension format for IDE support and editing
+  - suparepo reads `.custom.dart` at generation time and embeds directly into the generated class
+  - No longer need to import `.custom.dart` from use_case layer
+  - Custom methods can now be properly overridden in fake repositories for testing
 
 ## [1.10.1] - 2026-03-11
 
 ### Fixed
 
-- 複数行フィールド宣言（`static const _x =\n '...';`）の後のカスタムメソッドが移行されないバグを修正
-- カスタムメソッドが参照する private static field を extension に自動移行するよう対応
+- Fix custom methods not being migrated when preceded by multi-line field declarations (`static const _x =\n '...';`)
+- Auto-migrate private static fields referenced by custom methods into the extension
 
 ## [1.10.0] - 2026-03-11
 
 ### Added
 
-- カスタムメソッド自動移行機能
-  - 再生成時に既存リポジトリファイルのカスタムメソッドを検出
-  - `*_repository.custom.dart` に extension として自動移行
-  - `_client` → `client` の参照を自動置換
-  - 既存 `.custom.dart` ファイルとのマージ対応（重複スキップ）
-  - カスタム import も自動移行
-  - `--no-migrate` フラグで移行スキップ可能
+- Automatic custom method migration
+  - Detect custom methods in existing repository files during regeneration
+  - Auto-migrate to `*_repository.custom.dart` as extensions
+  - Auto-replace `_client` references with `client`
+  - Merge with existing `.custom.dart` files (skip duplicates)
+  - Auto-migrate custom imports
+  - `--no-migrate` flag to skip migration
 
 ## [1.9.0] - 2026-03-11
 
 ### Added
 
-- リポジトリクラスに `client` getter を追加（extension でカスタムメソッドを追加可能に）
-  - 再生成時にカスタムコードが消える問題を解消
-  - カスタムメソッドは `*_repository.custom.dart` に extension として記述
+- Add `client` getter to repository classes (enables adding custom methods via extensions)
+  - Resolves issue of custom code being lost during regeneration
+  - Custom methods are written as extensions in `*_repository.custom.dart`
 
 ### Fixed
 
-- TS型抽出器が `statusMap: Record<string, number>` パターンからエラーコードを検出できないバグを修正
-  - `error: data.error` のような変数参照＋statusMap経由のエラーコードに対応
-  - 既存のリテラル `error: "..."` パターンとマージして重複排除
+- Fix TS type extractor failing to detect error codes from `statusMap: Record<string, number>` patterns
+  - Support error codes via variable references like `error: data.error` + statusMap lookup
+  - Merge with existing literal `error: "..."` patterns and deduplicate
 
 ## [1.8.4] - 2026-03-11
 
@@ -169,24 +185,24 @@ Generates `GetMembershipRankInfoResult` Freezed class and the RPC client returns
 
 ### Fixed
 
-- Edge Function エラークラスの `fromFunctionException` で `e.details` が `Map<String, dynamic>` の場合に `as String` キャストで実行時エラーになるバグを修正
-  - Supabase SDK が JSON レスポンスを自動デコードし `Map<String, dynamic>` を返す場合に対応
-  - `e.details` の実際の型を switch 式で判定し、`String`（未デコード）と `Map<String, dynamic>`（デコード済み）の両方に対応
+- Fix Edge Function error class `fromFunctionException` crashing with `as String` cast when `e.details` is `Map<String, dynamic>`
+  - Handle cases where Supabase SDK auto-decodes JSON responses to `Map<String, dynamic>`
+  - Use switch expression on actual type of `e.details` to support both `String` (raw) and `Map<String, dynamic>` (decoded)
 
 ## [1.8.2] - 2026-03-04
 
 ### Fixed
 
-- Edge Function クライアントの `response.data` 型キャストエラーを修正
-  - Supabase SDK が `Content-Type: application/json` のレスポンスを自動デコードし `Map<String, dynamic>` を返す場合、`as List<int>` キャストで実行時エラーが発生していた
-  - `response.data` の実際の型を動的に判定し、`List<int>`（バイト列）と `Map<String, dynamic>`（デコード済み）の両方に対応
+- Fix Edge Function client `response.data` type cast error
+  - Supabase SDK auto-decodes `Content-Type: application/json` responses to `Map<String, dynamic>`, causing `as List<int>` cast to fail at runtime
+  - Dynamically check actual type of `response.data` to support both `List<int>` (raw bytes) and `Map<String, dynamic>` (decoded)
 
 ## [1.8.1] - 2026-03-03
 
 ### Fixed
 
-- `fromRow()` の DateTime 型フィールドで `as DateTime` キャストが実行時エラーになるバグを修正
-  - Supabase RPC の JSON レスポンスではタイムスタンプが文字列として返されるため、`DateTime.parse(row['col'] as String)` に変更
+- Fix `fromRow()` DateTime field crashing with `as DateTime` cast at runtime
+  - Supabase RPC JSON responses return timestamps as strings, changed to `DateTime.parse(row['col'] as String)`
 
 ## [1.8.0] - 2026-03-03
 
@@ -220,7 +236,7 @@ Generates `GetMembershipRankInfoResult` Freezed class and the RPC client returns
 
 ### Fixed
 
-- READMEのエラー型生成セクションのコード例を汎用的な例に修正
+- Fix error type generation code examples in README to use generic examples
 
 ## [1.7.0] - 2026-02-23
 
@@ -344,15 +360,15 @@ Generates `GetMembershipRankInfoResult` Freezed class and the RPC client returns
 
 ### Added
 
-- `client_provider_output` — カスタム出力パスで `supabase_client_provider.dart` を任意の場所に生成可能に
-- `client_provider_import` — 生成コード内のプロバイダー import パスをカスタマイズ可能に
+- `client_provider_output` — generate `supabase_client_provider.dart` at a custom output path
+- `client_provider_import` — customize the provider import path in generated code
 
 ## [1.3.2] - 2026-02-18
 
 ### Fixed
 
-- RPC client: void 戻り値の関数で未使用の `response` 変数を除去
-- RPC client: `rpc()` に明示的な型引数を追加し `inference_failure_on_function_invocation` を解消
+- RPC client: remove unused `response` variable for void return type functions
+- RPC client: add explicit type arguments to `rpc()` to resolve `inference_failure_on_function_invocation`
 
 ## [1.3.1] - 2026-02-18
 

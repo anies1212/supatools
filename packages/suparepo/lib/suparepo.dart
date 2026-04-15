@@ -59,3 +59,4 @@ export 'src/edge_function_generator.dart' show EdgeFunctionGenerator;
 export 'src/edge_function_info.dart'
     show EdgeFunctionInfo, EdgeFunctionFieldDef, EdgeFunctionModelDef;
 export 'src/ts_type_extractor.dart' show TsTypeExtractor, TsTypeExtractorLoader;
+export 'src/supa_query_generator.dart' show SupaQueryGenerator, SupaQueryMethodInfo;

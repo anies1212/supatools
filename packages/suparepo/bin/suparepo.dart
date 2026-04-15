@@ -6,6 +6,7 @@ import 'package:suparepo/src/config_loader.dart';
 import 'package:recase/recase.dart';
 import 'package:suparepo/src/custom_method_migrator.dart';
 import 'package:suparepo/src/repository_generator.dart';
+import 'package:suparepo/src/supa_query_generator.dart';
 import 'package:suparepo/src/rpc_generator.dart';
 import 'package:suparepo/src/rpc_result_model_generator.dart';
 import 'package:suparepo/src/edge_function_detector.dart';
@@ -139,7 +140,7 @@ Future<int> _generateRepositories(
 
   var generatedCount = 0;
 
-  // カスタムメソッド移行: 上書き前に既存ファイルを検査
+  // Migrate custom methods: inspect existing files before overwrite
   if (migrate) {
     final migrator = CustomMethodMigrator();
 
@@ -163,7 +164,7 @@ Future<int> _generateRepositories(
       final customFilePath = p.join(outputDir, customFileName);
       final customFile = File(customFilePath);
 
-      // モデルimportの解決
+      // Resolve model import path
       String? modelImport;
       if (config.modelImportPrefix != null) {
         final modelFile =
@@ -174,7 +175,7 @@ Future<int> _generateRepositories(
       }
 
       if (await customFile.exists()) {
-        // 既存extensionファイルとマージ
+        // Merge with existing extension file
         final existingCustomCode = await customFile.readAsString();
         final mergeResult = migrator.mergeWithExisting(
           existingCustomCode,
@@ -195,7 +196,7 @@ Future<int> _generateRepositories(
           );
         }
       } else {
-        // 新規extensionファイル生成
+        // Generate new extension file
         final extensionCode = migrator.generateExtensionFile(
           className: className,
           repositoryFileName: repoFileName,
@@ -215,8 +216,32 @@ Future<int> _generateRepositories(
     }
   }
 
-  // .custom.dartファイルからカスタムメソッドを読み取り、
-  // 生成されるリポジトリクラスに埋め込む
+  // Process @SupaQuery annotations in .custom.dart files
+  final queryGenerator = SupaQueryGenerator();
+
+  for (final table in filtered) {
+    final customFileName =
+        '${ReCase(table.name).snakeCase}_repository.custom.dart';
+    final customFilePath = p.join(outputDir, customFileName);
+    final customFile = File(customFilePath);
+
+    if (!await customFile.exists()) continue;
+
+    final customCode = await customFile.readAsString();
+    final processed = queryGenerator.processCustomFile(
+      customCode,
+      table.name,
+    );
+
+    if (processed != null) {
+      await customFile.writeAsString(processed);
+      print('⚡ Generated @SupaQuery methods: $customFileName');
+      generatedCount++;
+    }
+  }
+
+  // Read .custom.dart files and embed custom methods into generated
+  // repository classes
   final customContents = <String, CustomFileContent>{};
   final embedMigrator = CustomMethodMigrator();
 
@@ -239,7 +264,7 @@ Future<int> _generateRepositories(
       print('📎 Embedding custom methods: $customFileName');
     }
 
-    // .custom.dart の未使用importをクリーンアップ
+    // Clean up unused imports in .custom.dart
     final cleaned = embedMigrator.cleanupCustomFileImports(customCode);
     if (cleaned != null) {
       await customFile.writeAsString(cleaned);
@@ -248,7 +273,7 @@ Future<int> _generateRepositories(
     }
   }
 
-  // リポジトリ生成（上書き）
+  // Generate repositories (overwrite)
   final files = generator.generateAllRepositories(
     filtered,
     customContents: customContents,
@@ -279,7 +304,7 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     return 0;
   }
 
-  // YAML return_types で上書き（YAML最優先）
+  // Override with YAML return_types (YAML takes highest priority)
   final returnTypes = config.rpc.returnTypes;
   if (returnTypes != null) {
     functions = applyReturnTypeOverrides(functions, returnTypes);

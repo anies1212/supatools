@@ -10,6 +10,7 @@ workspace:
   - packages/supabase_schema_core
   - packages/supafreeze
   - packages/suparepo
+  - packages/supa_query_annotation
 
 dev_dependencies:
   melos: ^7.3.0

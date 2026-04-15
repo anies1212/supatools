@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- enum型フィールドが`dynamic`になるバグを修正（`mergeEnumTypes`にOpenAPI enum情報を渡すよう修正）
+- Fix enum-typed fields becoming `dynamic` (pass OpenAPI enum info to `mergeEnumTypes`)
 
 ## [2.1.0] - 2026-03-11
 

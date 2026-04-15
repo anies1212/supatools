@@ -12,7 +12,7 @@ void main() {
   });
 
   group('parseRpcFunctions', () {
-    test('パラメータあり・setof戻り値の関数をパース', () {
+    test('parses function with parameters and setof return', () {
       final spec = _buildSpec({
         '/rpc/get_user_posts': {
           'post': {
@@ -58,7 +58,7 @@ void main() {
       expect(functions[0].params[0].isRequired, isTrue);
     });
 
-    test('パラメータなし関数をパース', () {
+    test('parses function without parameters', () {
       final spec = _buildSpec({
         '/rpc/get_server_time': {
           'post': {
@@ -84,7 +84,7 @@ void main() {
       expect(functions[0].returnType, 'timestamptz');
     });
 
-    test('複数パラメータ + required/optional判定', () {
+    test('multiple parameters with required/optional detection', () {
       final spec = _buildSpec({
         '/rpc/search_users': {
           'post': {
@@ -142,7 +142,7 @@ void main() {
       expect(offsetParam.isRequired, isFalse);
     });
 
-    test('スカラー戻り値をパース', () {
+    test('parses scalar return type', () {
       final spec = _buildSpec({
         '/rpc/count_active_users': {
           'post': {
@@ -166,7 +166,7 @@ void main() {
       expect(functions[0].returnType, 'int8');
     });
 
-    test('void戻り値をパース', () {
+    test('parses void return type', () {
       final spec = _buildSpec({
         '/rpc/cleanup_old_data': {
           'post': {
@@ -185,7 +185,7 @@ void main() {
       expect(functions[0].returnsSetOf, isFalse);
     });
 
-    test('/rpc/以外のパスは無視', () {
+    test('ignores non-/rpc/ paths', () {
       final spec = _buildSpec({
         '/users': {
           'get': {
@@ -223,7 +223,7 @@ void main() {
       expect(functions[0].name, 'my_func');
     });
 
-    test('複数RPC関数をパース', () {
+    test('parses multiple RPC functions', () {
       final spec = _buildSpec({
         '/rpc/func_a': {
           'post': {
@@ -269,7 +269,7 @@ void main() {
       expect(functions.map((f) => f.name), containsAll(['func_a', 'func_b']));
     });
 
-    test('bodyパラメータがない場合は空のパラメータリスト', () {
+    test('returns empty parameter list when no body parameter', () {
       final spec = _buildSpec({
         '/rpc/no_body': {
           'post': {
@@ -295,7 +295,7 @@ void main() {
       expect(functions[0].params, isEmpty);
     });
 
-    test('pathsが空の場合は空リスト', () {
+    test('returns empty list when paths is empty', () {
       final spec = <String, dynamic>{
         'paths': <String, dynamic>{},
       };
@@ -304,7 +304,7 @@ void main() {
       expect(functions, isEmpty);
     });
 
-    test('pathsキーがない場合は空リスト', () {
+    test('returns empty list when paths key is missing', () {
       final spec = <String, dynamic>{};
 
       final functions = fetcher.parseRpcFunctions(spec);
@@ -313,7 +313,7 @@ void main() {
   });
 
   group('mergeReturnTypes', () {
-    test('voidをboolに補正', () {
+    test('corrects void to bool', () {
       final functions = [
         RpcFunctionInfo(
           name: 'is_active',
@@ -334,7 +334,7 @@ void main() {
       expect(result[0].returnsSetOf, isFalse);
     });
 
-    test('voidをint4に補正', () {
+    test('corrects void to int4', () {
       final functions = [
         RpcFunctionInfo(
           name: 'count_items',
@@ -355,7 +355,7 @@ void main() {
       expect(result[0].returnsSetOf, isFalse);
     });
 
-    test('非voidはそのまま維持', () {
+    test('non-void is kept as-is', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_count',
@@ -375,7 +375,7 @@ void main() {
       expect(result[0].returnType, 'int8');
     });
 
-    test('pg_proc結果が空でも壊れない', () {
+    test('handles empty pg_proc results gracefully', () {
       final functions = [
         RpcFunctionInfo(
           name: 'my_func',
@@ -393,7 +393,7 @@ void main() {
       expect(result[0].returnType, 'void');
     });
 
-    test('record型(非setof)はvoidのまま維持', () {
+    test('record type (non-setof) remains void', () {
       final functions = [
         RpcFunctionInfo(
           name: 'do_something',
@@ -413,7 +413,7 @@ void main() {
       expect(result[0].returnType, 'void');
     });
 
-    test('record型 + returnsSet(RETURNS TABLE)はsetof jsonbに補正', () {
+    test('record + returnsSet (RETURNS TABLE) corrected to setof jsonb', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_statuses',
@@ -434,7 +434,7 @@ void main() {
       expect(result[0].returnsSetOf, isTrue);
     });
 
-    test('returnsSetも補正される', () {
+    test('returnsSet is also corrected', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_names',
@@ -455,7 +455,7 @@ void main() {
       expect(result[0].returnsSetOf, isTrue);
     });
 
-    test('複数関数の混在ケース', () {
+    test('mixed multiple functions', () {
       final functions = [
         RpcFunctionInfo(
           name: 'is_active',
@@ -491,7 +491,7 @@ void main() {
   });
 
   group('mergeTableColumns', () {
-    test('該当する関数にtableColumnsをマージ', () {
+    test('merges tableColumns into matching functions', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_invite_code',
@@ -526,7 +526,7 @@ void main() {
       expect(result[1].tableColumns, isNull);
     });
 
-    test('空のマップでも壊れない', () {
+    test('handles empty map gracefully', () {
       final functions = [
         RpcFunctionInfo(
           name: 'my_func',
@@ -544,7 +544,7 @@ void main() {
       expect(result[0].tableColumns, isNull);
     });
 
-    test('複数関数への一括マージ', () {
+    test('batch merge into multiple functions', () {
       final functions = [
         RpcFunctionInfo(
           name: 'func_a',
@@ -578,7 +578,7 @@ void main() {
       expect(result[1].tableColumns, hasLength(2));
     });
 
-    test('既存のreturnType/returnsSetOfは維持される', () {
+    test('preserves existing returnType/returnsSetOf', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_data',
@@ -853,7 +853,7 @@ END;
   });
 
   group('parseRpcErrorCodes', () {
-    test('return query select false パターン', () {
+    test('return query select false pattern', () {
       final source = '''
 BEGIN
   IF condition1 THEN
@@ -873,7 +873,7 @@ END;
       expect(codes, contains('insufficient_balance'));
     });
 
-    test('return query select false::bool パターン', () {
+    test('return query select false::bool pattern', () {
       final source = '''
 BEGIN
   return query select false::bool, 'account_age_requirement'::text;
@@ -887,7 +887,7 @@ END;
       expect(codes, contains('account_age_requirement'));
     });
 
-    test('error := パターン', () {
+    test('error := assignment pattern', () {
       final source = '''
 DECLARE
   error text;
@@ -905,7 +905,7 @@ END;
       expect(codes, contains('invalid_input'));
     });
 
-    test('空文字列と非snake_caseは無視', () {
+    test('ignores empty strings and non-snake_case', () {
       final source = '''
 BEGIN
   return query select false, ''::text;
@@ -920,7 +920,7 @@ END;
       expect(codes, contains('valid_code'));
     });
 
-    test('エラーコードなしは空リスト', () {
+    test('returns empty list when no error codes', () {
       final source = '''
 BEGIN
   return query select true, ''::text;
@@ -931,7 +931,7 @@ END;
       expect(codes, isEmpty);
     });
 
-    test('重複コードは除去される', () {
+    test('deduplicates error codes', () {
       final source = '''
 BEGIN
   return query select false, 'same_error'::text;
@@ -973,7 +973,7 @@ END;
       expect(info.columns[1].name, 'uploaded');
     });
 
-    test('json_agg パターンなしは空マップ', () {
+    test('returns empty map when no json_agg pattern', () {
       final source = '''
 BEGIN
   return query select 1;

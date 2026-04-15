@@ -20,7 +20,7 @@ void main() {
   }
 
   group('SuparepoConfigLoader', () {
-    test('基本設定のパース', () async {
+    test('parses basic configuration', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -39,7 +39,7 @@ output: lib/repos
       expect(config.edgeFunctions.enabled, isFalse);
     });
 
-    test('RPC設定のパース', () async {
+    test('parses RPC configuration', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -70,7 +70,7 @@ rpc:
       expect(config.rpc.exclude, ['internal_cleanup']);
     });
 
-    test('Edge Function設定のパース', () async {
+    test('parses Edge Function configuration', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -94,7 +94,7 @@ edge_functions:
       expect(config.edgeFunctions.include, ['send-email']);
     });
 
-    test('Edge Function modelsセクションのパース', () async {
+    test('parses Edge Function models section', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -143,7 +143,7 @@ edge_functions:
       expect(sendEmail.response![1].isRequired, isFalse);
     });
 
-    test('client_provider_output/importのパース', () async {
+    test('parses client_provider_output/import', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -168,7 +168,7 @@ client_provider_import: package:gateway/supabase/supabase_client_provider.dart
       );
     });
 
-    test('RPC return_typesのパース', () async {
+    test('parses RPC return_types', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -194,7 +194,7 @@ rpc:
       expect(rt['is_active_user'], 'bool');
     });
 
-    test('RPC return_types未指定はnull', () async {
+    test('RPC return_types is null when not specified', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -210,7 +210,7 @@ rpc:
       expect(config!.rpc.returnTypes, isNull);
     });
 
-    test('RPC generate_result_modelsのパース', () async {
+    test('parses RPC generate_result_models', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -232,7 +232,7 @@ rpc:
       );
     });
 
-    test('RPC result_modelsのパース', () async {
+    test('parses RPC result_models', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -273,7 +273,7 @@ rpc:
       expect(profile[1].name, 'avatar_url');
     });
 
-    test('RPC result_models未指定はnull', () async {
+    test('RPC result_models is null when not specified', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -289,7 +289,7 @@ rpc:
       expect(config!.rpc.resultModels, isNull);
     });
 
-    test('RPC result_models shorthand記法', () async {
+    test('RPC result_models shorthand syntax', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -314,7 +314,7 @@ rpc:
       expect(stats[1].dataType, 'text');
     });
 
-    test('generate_result_modelsデフォルトはfalse', () async {
+    test('generate_result_models defaults to false', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -331,7 +331,7 @@ rpc:
       expect(config.rpc.resultModelsOutput, isNull);
     });
 
-    test('デフォルト値の適用', () async {
+    test('applies default values', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co
 secret_key: test-secret-key-long-enough
@@ -359,7 +359,7 @@ secret_key: test-secret-key-long-enough
       );
     });
 
-    test('ファイルが存在しない場合はnull', () async {
+    test('returns null when file does not exist', () async {
       final loader = SuparepoConfigLoader(
         envVars: const {},
       );
@@ -372,7 +372,7 @@ secret_key: test-secret-key-long-enough
   });
 
   group('RpcConfig.shouldIncludeFunction', () {
-    test('includeリストで指定された関数のみ含める', () {
+    test('include list only includes specified functions', () {
       const config = RpcConfig(
         include: ['func_a', 'func_b'],
       );
@@ -382,7 +382,7 @@ secret_key: test-secret-key-long-enough
       expect(config.shouldIncludeFunction('func_c'), isFalse);
     });
 
-    test('excludeリストで指定された関数を除外', () {
+    test('exclude list excludes specified functions', () {
       const config = RpcConfig(
         exclude: ['internal_func'],
       );
@@ -397,7 +397,7 @@ secret_key: test-secret-key-long-enough
       );
     });
 
-    test('フィルタなしの場合は全て含める', () {
+    test('includes all when no filter is set', () {
       const config = RpcConfig();
 
       expect(config.shouldIncludeFunction('any_func'), isTrue);
@@ -405,7 +405,7 @@ secret_key: test-secret-key-long-enough
   });
 
   group('EdgeFunctionConfig.shouldIncludeFunction', () {
-    test('includeリストで指定された関数のみ含める', () {
+    test('include list only includes specified functions', () {
       const config = EdgeFunctionConfig(
         include: ['send-email'],
       );
@@ -420,7 +420,7 @@ secret_key: test-secret-key-long-enough
       );
     });
 
-    test('excludeリストで指定された関数を除外', () {
+    test('exclude list excludes specified functions', () {
       const config = EdgeFunctionConfig(
         exclude: ['debug-func'],
       );

@@ -57,7 +57,7 @@ class RpcResultModelGenerator {
     buffer.writeln();
 
     // Doc comment
-    buffer.writeln('/// `${func.name}` RPC のレスポンスモデル。');
+    buffer.writeln('/// Response model for `${func.name}` RPC.');
 
     // Class
     buffer.writeln('@freezed');
@@ -289,7 +289,7 @@ class RpcResultModelGenerator {
     buffer.writeln();
 
     // Doc comment
-    buffer.writeln('/// `${func.name}` RPC のエラーコード型。');
+    buffer.writeln('/// Error code type for `${func.name}` RPC.');
 
     // Sealed class
     buffer.writeln('@freezed');

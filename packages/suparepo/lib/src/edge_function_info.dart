@@ -29,7 +29,7 @@ class EdgeFunctionFieldDef {
       'required: $isRequired)';
 }
 
-/// Edge Functionのエラーコード定義
+/// Error code definition for an Edge Function
 class EdgeFunctionErrorDef {
   final String code;
   final int? statusCode;

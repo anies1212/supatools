@@ -11,8 +11,8 @@ void main() {
   });
 
   group('TsTypeExtractor', () {
-    group('リクエスト型抽出', () {
-      test('body as { ... } パターンからフィールド抽出', () {
+    group('request type extraction', () {
+      test('extracts fields from body as { ... } pattern', () {
         const source = '''
 const body = await req.json();
 const { amount, provider } = body as {
@@ -42,7 +42,7 @@ if (!amount || !provider) {
         expect(provider.isRequired, isTrue);
       });
 
-      test('?なしフィールドはrequired', () {
+      test('field without ? is required', () {
         const source = '''
 const { id } = body as {
   id: string;
@@ -52,7 +52,7 @@ const { id } = body as {
         expect(result!.request!.first.isRequired, isTrue);
       });
 
-      test('?ありでバリデーションなしはoptional', () {
+      test('field with ? and no validation is optional', () {
         const source = '''
 const { note } = body as {
   note?: string;
@@ -66,7 +66,7 @@ return new Response(
         expect(result!.request!.first.isRequired, isFalse);
       });
 
-      test('booleanのtypeofチェックでrequired', () {
+      test('boolean typeof check makes field required', () {
         const source = '''
 const { is_active } = body as {
   is_active?: boolean;
@@ -88,7 +88,7 @@ return new Response(
         expect(result.request!.first.isRequired, isTrue);
       });
 
-      test('複数フィールドの混在（required/optional）', () {
+      test('mixed required/optional fields', () {
         const source = '''
 const {
   campaign_id,
@@ -120,7 +120,7 @@ if (!campaign_id || !store_name || !total_amount) {
         expect(branchName.isRequired, isFalse);
       });
 
-      test('単一フィールドの短縮パターン', () {
+      test('single field shorthand pattern', () {
         const source = '''
 const { receipt_id } = body as { receipt_id?: string };
 if (!receipt_id) {
@@ -137,8 +137,8 @@ if (!receipt_id) {
       });
     });
 
-    group('レスポンス型抽出', () {
-      test('成功レスポンスのJSON.stringifyからフィールド抽出', () {
+    group('response type extraction', () {
+      test('extracts fields from success response JSON.stringify', () {
         const source = '''
 return new Response(
   JSON.stringify({
@@ -157,7 +157,7 @@ return new Response(
         );
       });
 
-      test('エラーレスポンス(status 400)は無視される', () {
+      test('error response (status 400) is ignored', () {
         const source = '''
 if (!id) {
   return new Response(
@@ -175,7 +175,7 @@ return new Response(
         expect(result.response!.first.name, 'data');
       });
 
-      test('booleanリテラルの型推論', () {
+      test('boolean literal type inference', () {
         const source = '''
 return new Response(
   JSON.stringify({ success: true, is_favorite }),
@@ -193,7 +193,7 @@ return new Response(
         expect(isFavorite.dataType, 'bool');
       });
 
-      test('points/amountは整数型として推論', () {
+      test('points/amount are inferred as integer type', () {
         const source = '''
 return new Response(
   JSON.stringify({
@@ -210,8 +210,8 @@ return new Response(
       });
     });
 
-    group('handler.tsとの結合', () {
-      test('index.tsに型情報なし、handler.tsから抽出', () {
+    group('handler.ts integration', () {
+      test('no type info in index.ts, extracts from handler.ts', () {
         const indexSource = '''
 import { handler } from "./handler.ts";
 Deno.serve(handler);
@@ -245,7 +245,7 @@ export async function handler(req: Request): Promise<Response> {
       });
     });
 
-    group('型マッピング', () {
+    group('type mapping', () {
       test('string -> text', () {
         const source = '''
 const { x } = body as { x: string };
@@ -271,8 +271,8 @@ const { x } = body as { x: boolean };
       });
     });
 
-    group('エラーコード抽出', () {
-      test('snake_caseのエラーコードを検出', () {
+    group('error code extraction', () {
+      test('detects snake_case error codes', () {
         const source = '''
 return new Response(
   JSON.stringify({ error: "outside_time_window", message: "Not in time" }),
@@ -287,7 +287,7 @@ return new Response(
         expect(result.errors!.first.statusCode, 400);
       });
 
-      test('汎用メッセージ（非snake_case）はスキップ', () {
+      test('skips generic messages (non-snake_case)', () {
         const source = '''
 return new Response(
   JSON.stringify({ error: "Missing" }),
@@ -307,11 +307,11 @@ return new Response(
 );
 ''';
         final result = extractor.extract(indexSource: source);
-        // errorsがnullであること（snake_caseでないため）
+        // errors should be null (not snake_case)
         expect(result, isNull);
       });
 
-      test('複数エラーコードの検出', () {
+      test('detects multiple error codes', () {
         const source = '''
 if (outsideWindow) {
   return new Response(
@@ -339,7 +339,7 @@ return new Response(
         expect(codes, contains('already_participated'));
       });
 
-      test('ステータスコードの紐付け', () {
+      test('associates status codes correctly', () {
         const source = '''
 return new Response(
   JSON.stringify({ error: "insufficient_balance" }),
@@ -373,7 +373,7 @@ return new Response(
         expect(internal.statusCode, 500);
       });
 
-      test('重複エラーコードは1つにまとめる', () {
+      test('deduplicates error codes', () {
         const source = '''
 if (cond1) {
   return new Response(
@@ -393,7 +393,7 @@ if (cond2) {
         expect(result.errors!.first.code, 'duplicate_entry');
       });
 
-      test('成功レスポンス(2xx)のerrorフィールドは無視', () {
+      test('ignores error field in success response (2xx)', () {
         const source = '''
 return new Response(
   JSON.stringify({ error: "some_error_code" }),
@@ -401,11 +401,11 @@ return new Response(
 );
 ''';
         final result = extractor.extract(indexSource: source);
-        // 2xxなのでエラーとして検出されない
+        // 2xx status, not detected as error
         expect(result?.errors, isNull);
       });
 
-      test('リクエスト・レスポンス・エラーすべて抽出', () {
+      test('extracts request, response, and errors all together', () {
         const source = '''
 const { name } = body as { name?: string };
 if (!name) {
@@ -428,8 +428,8 @@ return new Response(
       });
     });
 
-    group('statusMapパターンのエラーコード抽出', () {
-      test('Record<string, number>のstatusMapからエラーコード検出', () {
+    group('statusMap pattern error code extraction', () {
+      test('detects error codes from Record<string, number> statusMap', () {
         const source = '''
 if (data.error) {
   const statusMap: Record<string, number> = {
@@ -459,7 +459,7 @@ if (data.error) {
         expect(codes, contains('duplicate_receipt'));
       });
 
-      test('statusMapのステータスコードが正しく紐付く', () {
+      test('statusMap status codes are correctly associated', () {
         const source = '''
 const statusMap: Record<string, number> = {
   not_found_item: 404,
@@ -480,7 +480,7 @@ const statusMap: Record<string, number> = {
         expect(rateLimited.statusCode, 429);
       });
 
-      test('statusMapとリテラルエラーコードの混在', () {
+      test('mixed statusMap and literal error codes', () {
         const source = '''
 if (!name) {
   return new Response(
@@ -511,7 +511,7 @@ return new Response(
         expect(codes, contains('already_exists'));
       });
 
-      test('statusMapの重複エラーコードはリテラルと統合', () {
+      test('statusMap duplicate error codes are merged with literals', () {
         const source = '''
 return new Response(
   JSON.stringify({ error: "duplicate_entry" }),
@@ -529,7 +529,7 @@ const statusMap: Record<string, number> = {
         expect(codes.where((c) => c == 'duplicate_entry'), hasLength(1));
       });
 
-      test('statusMap内の非snake_caseキーはスキップ', () {
+      test('skips non-snake_case keys in statusMap', () {
         const source = '''
 const statusMap: Record<string, number> = {
   valid_error: 400,
@@ -543,19 +543,19 @@ const statusMap: Record<string, number> = {
       });
     });
 
-    group('エッジケース', () {
-      test('body asパターンがない場合はnull', () {
+    group('edge cases', () {
+      test('returns null when no body as pattern', () {
         const source = 'console.log("hello");';
         final result = extractor.extract(indexSource: source);
         expect(result, isNull);
       });
 
-      test('空文字列でnull', () {
+      test('returns null for empty string', () {
         final result = extractor.extract(indexSource: '');
         expect(result, isNull);
       });
 
-      test('コメント内のbody asパターンは無視', () {
+      test('ignores body as pattern inside comments', () {
         const source = '''
 // const { x } = body as { x: string };
 /* const { y } = body as { y: number }; */
@@ -578,7 +578,7 @@ console.log("no body as here");
       await tempDir.delete(recursive: true);
     });
 
-    test('handler.tsから型を抽出', () async {
+    test('extracts types from handler.ts', () async {
       final funcDir = Directory(p.join(tempDir.path, 'my-func'));
       await funcDir.create();
 
@@ -624,7 +624,7 @@ export async function handler(req: Request): Promise<Response> {
       expect(amount.isRequired, isTrue);
     });
 
-    test('index.tsが存在しない場合はnull', () async {
+    test('returns null when index.ts does not exist', () async {
       final funcDir = Directory(p.join(tempDir.path, 'no-func'));
       await funcDir.create();
 
@@ -634,7 +634,7 @@ export async function handler(req: Request): Promise<Response> {
       expect(result, isNull);
     });
 
-    test('handler.tsなしでindex.tsから抽出', () async {
+    test('extracts from index.ts without handler.ts', () async {
       final funcDir = Directory(p.join(tempDir.path, 'simple-func'));
       await funcDir.create();
 

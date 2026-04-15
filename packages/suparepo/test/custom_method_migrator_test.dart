@@ -11,7 +11,7 @@ void main() {
   });
 
   group('getCustomFileName', () {
-    test('テーブル名からカスタムファイル名を生成', () {
+    test('generates custom file name from table name', () {
       expect(
         migrator.getCustomFileName('user_profiles'),
         'user_profiles_repository.custom.dart',
@@ -20,7 +20,7 @@ void main() {
   });
 
   group('extractCustomMethods', () {
-    test('標準メソッドのみのファイル → 空リスト', () {
+    test('file with only standard methods returns empty list', () {
       const source = '''
 class UsersRepository {
   final SupabaseClient _client;
@@ -95,7 +95,7 @@ class UsersRepository {
       expect(result.customMethods, isEmpty);
     });
 
-    test('カスタムメソッド1つ → 正しく抽出', () {
+    test('single custom method is correctly extracted', () {
       const source = '''
 class UsersRepository {
   final SupabaseClient _client;
@@ -164,7 +164,7 @@ class UsersRepository {
     return response.map((e) => User.fromJson(e)).toList();
   }
 
-  /// アクティブなユーザーを取得
+  /// Get active users
   Future<List<User>> getActive() async {
     final response = await _client
         .from(tableName)
@@ -184,11 +184,11 @@ class UsersRepository {
       );
       expect(
         result.customMethods.first.source,
-        contains('アクティブなユーザーを取得'),
+        contains('Get active users'),
       );
     });
 
-    test('カスタムメソッド複数 → 全て抽出', () {
+    test('multiple custom methods are all extracted', () {
       const source = '''
 class ProjectsRepository {
   final SupabaseClient _client;
@@ -293,7 +293,7 @@ class ProjectsRepository {
       );
     });
 
-    test('getAllWith{Relation}は標準メソッドとして除外', () {
+    test('getAllWith{Relation} is excluded as standard method', () {
       const source = '''
 class OrdersRepository {
   final SupabaseClient _client;
@@ -334,7 +334,7 @@ class OrdersRepository {
       expect(result.customMethods.first.name, 'getByStatus');
     });
 
-    test('ネストした波括弧を含むメソッド → 正しい境界検出', () {
+    test('method with nested braces has correct boundary detection', () {
       const source = '''
 class UsersRepository {
   final SupabaseClient _client;
@@ -381,7 +381,7 @@ class UsersRepository {
       );
     });
 
-    test('カスタムimportの検出', () {
+    test('detects custom imports', () {
       const source = '''
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user.supafreeze.dart';
@@ -419,7 +419,7 @@ class UsersRepository {
       );
     });
 
-    test('文字列リテラル内の波括弧はスキップ', () {
+    test('skips braces inside string literals', () {
       const source = '''
 class UsersRepository {
   final SupabaseClient _client;
@@ -453,11 +453,11 @@ class UsersRepository {
   });
 
   group('generateExtensionFile', () {
-    test('正しいextensionファイルを生成', () {
+    test('generates correct extension file', () {
       final methods = [
         const MethodInfo(
           name: 'getActive',
-          source: '''  /// アクティブなユーザーを取得
+          source: '''  /// Get active users
   Future<List<User>> getActive() async {
     final response = await _client
         .from(tableName)
@@ -479,16 +479,16 @@ class UsersRepository {
 
       expect(code, contains('extension UsersRepositoryCustom on UsersRepository'));
       expect(code, contains("import 'users_repository.dart';"));
-      // User型を参照 → model importあり
+      // references User type -> model import present
       expect(code, contains("import '../models/user.supafreeze.dart';"));
-      // SupabaseClient型は直接参照なし → supabase importなし
+      // SupabaseClient not directly referenced -> no supabase import
       expect(code, isNot(contains('supabase_flutter')));
-      // _client → client 置換
+      // _client -> client replacement
       expect(code, contains('await client'));
       expect(code, isNot(contains('_client')));
     });
 
-    test('SupabaseClient型を直接参照 → supabase importあり', () {
+    test('directly references SupabaseClient -> supabase import present', () {
       final methods = [
         const MethodInfo(
           name: 'getClient',
@@ -508,7 +508,7 @@ class UsersRepository {
       expect(code, contains('supabase_flutter'));
     });
 
-    test('model型を参照しない → model importなし', () {
+    test('no model type reference -> no model import', () {
       final methods = [
         const MethodInfo(
           name: 'doSomething',
@@ -528,7 +528,7 @@ class UsersRepository {
       expect(code, isNot(contains('supafreeze')));
     });
 
-    test('カスタムimportが含まれる', () {
+    test('includes custom imports', () {
       final code = migrator.generateExtensionFile(
         className: 'UsersRepository',
         repositoryFileName: 'users_repository.dart',
@@ -552,11 +552,11 @@ class UsersRepository {
   });
 
   group('mergeWithExisting', () {
-    test('重複メソッドはスキップ', () {
+    test('skips duplicate methods', () {
       const existingCode = '''
 extension UsersRepositoryCustom on UsersRepository {
   Future<List<User>> getActive() async {
-    // 既存の実装
+    // existing implementation
     return [];
   }
 }
@@ -574,7 +574,7 @@ extension UsersRepositoryCustom on UsersRepository {
       expect(result.added, isEmpty);
     });
 
-    test('新規メソッドは追加', () {
+    test('adds new methods', () {
       const existingCode = '''
 extension UsersRepositoryCustom on UsersRepository {
   Future<List<User>> getActive() async {
@@ -602,8 +602,8 @@ extension UsersRepositoryCustom on UsersRepository {
     });
   });
 
-  group('private field移行', () {
-    test('カスタムメソッドが参照するprivate fieldが抽出される', () {
+  group('private field migration', () {
+    test('private fields referenced by custom methods are extracted', () {
       const source = '''
 class TestRepo {
   final SupabaseClient _client;
@@ -638,7 +638,7 @@ class TestRepo {
       expect(result.privateFields.first.name, '_joinSelect');
     });
 
-    test('参照されないprivate fieldは移行しない', () {
+    test('unreferenced private fields are not migrated', () {
       const source = '''
 class TestRepo {
   final SupabaseClient _client;
@@ -671,7 +671,7 @@ class TestRepo {
       expect(result.privateFields, isEmpty);
     });
 
-    test('private fieldがextensionに含まれる', () {
+    test('private fields are included in extension', () {
       final code = migrator.generateExtensionFile(
         className: 'TestRepo',
         repositoryFileName: 'test_repository.dart',
@@ -695,7 +695,7 @@ class TestRepo {
       expect(code, contains('getActive'));
     });
 
-    test('複数行のstatic const fieldが正しく抽出される', () {
+    test('multi-line static const fields are correctly extracted', () {
       const source = '''
 class TestRepo {
   final SupabaseClient _client;
@@ -732,7 +732,7 @@ class TestRepo {
   });
 
   group('extractFromCustomFile', () {
-    test('extension本体とimportを正しく抽出', () {
+    test('correctly extracts extension body and imports', () {
       const customCode = '''
 // Custom methods migrated from TestRepository
 // This file is auto-migrated by suparepo and will NOT be overwritten.
@@ -746,7 +746,7 @@ import 'test_repository.dart';
 extension TestRepositoryCustom on TestRepository {
   static const _joinSelect = 'id, name, products(*)';
 
-  /// アクティブなレコードを取得
+  /// Get active records
   Future<List<Map<String, dynamic>>> getActive() async {
     final response = await client
         .from(tableName)
@@ -763,19 +763,19 @@ extension TestRepositoryCustom on TestRepository {
       );
 
       expect(result, isNotNull);
-      // supabase, supafreeze, self-importは除外
+      // supabase, supafreeze, self-import are excluded
       expect(result!.imports, hasLength(1));
       expect(
         result.imports.first,
         "import 'package:data/some_model.dart';",
       );
-      // extension本体にメソッドとフィールドが含まれる
+      // extension body contains methods and fields
       expect(result.body, contains('_joinSelect'));
       expect(result.body, contains('getActive'));
-      expect(result.body, contains('アクティブなレコードを取得'));
+      expect(result.body, contains('Get active records'));
     });
 
-    test('空のextension → null', () {
+    test('empty extension returns null', () {
       const customCode = '''
 extension TestRepositoryCustom on TestRepository {
 }
@@ -789,7 +789,7 @@ extension TestRepositoryCustom on TestRepository {
       expect(result, isNull);
     });
 
-    test('extensionなし → null', () {
+    test('no extension returns null', () {
       const customCode = '''
 // Just a comment
 import 'test_repository.dart';
@@ -805,7 +805,7 @@ import 'test_repository.dart';
   });
 
   group('cleanupCustomFileImports', () {
-    test('未使用のsupabase/supafreeze importを除去', () {
+    test('removes unused supabase/supafreeze imports', () {
       const customCode = '''
 // ignore_for_file: type=lint
 
@@ -823,17 +823,17 @@ extension TestRepositoryCustom on TestRepository {
 
       final cleaned = migrator.cleanupCustomFileImports(customCode);
       expect(cleaned, isNotNull);
-      // supabase, supafreeze importが除去される
+      // supabase, supafreeze imports are removed
       expect(cleaned, isNot(contains('package:supabase')));
       expect(cleaned, isNot(contains('.supafreeze.dart')));
-      // 参照されているimportは保持
+      // referenced imports are kept
       expect(cleaned, contains('some_result.dart'));
       expect(cleaned, contains('test_repository.dart'));
     });
 
-    test('クラス名が部分一致するsupafreeze importを除去', () {
-      // tentame_projects.supafreeze.dart → TentameProjects だが
-      // TentameProjectsRepository に部分一致してはいけない
+    test('removes supafreeze import with partial class name match', () {
+      // tentame_projects.supafreeze.dart -> TentameProjects
+      // should not match TentameProjectsRepository as substring
       const customCode = '''
 // ignore_for_file: type=lint
 
@@ -856,7 +856,7 @@ extension TentameProjectsRepositoryCustom on TentameProjectsRepository {
       expect(cleaned, contains('tentame_projects_repository.dart'));
     });
 
-    test('全importが必要な場合 → null', () {
+    test('returns null when all imports are needed', () {
       const customCode = '''
 import 'package:data/some_result.dart';
 import 'test_repository.dart';
@@ -871,8 +871,8 @@ extension TestRepositoryCustom on TestRepository {
     });
   });
 
-  group('_client → client 置換', () {
-    test('メソッド内の_clientがclientに置換される', () {
+  group('_client to client replacement', () {
+    test('_client in methods is replaced with client', () {
       final methods = [
         const MethodInfo(
           name: 'test',
@@ -896,8 +896,8 @@ extension TestRepositoryCustom on TestRepository {
     });
   });
 
-  group('カスタムメソッド埋め込み（RepositoryGenerator連携）', () {
-    test('customContentが生成されるクラスに埋め込まれる', () {
+  group('custom method embedding (RepositoryGenerator integration)', () {
+    test('customContent is embedded in generated class', () {
       final generator = RepositoryGenerator();
       final table = TableInfo(
         name: 'test_table',
@@ -915,7 +915,7 @@ extension TestRepositoryCustom on TestRepository {
         body: '''
   static const _joinSelect = 'id, name, products(*)';
 
-  /// アクティブなレコードを取得
+  /// Get active records
   Future<List<Map<String, dynamic>>> getActive() async {
     final response = await client
         .from(tableName)
@@ -934,14 +934,14 @@ extension TestRepositoryCustom on TestRepository {
         customContent: customContent,
       );
 
-      // カスタムimportが含まれる
+      // custom import is included
       expect(code, contains("import 'package:data/some_model.dart';"));
-      // カスタムメソッドがクラス内に埋め込まれる
+      // custom methods are embedded in the class
       expect(code, contains('getActive'));
       expect(code, contains('_joinSelect'));
-      // extensionではなくクラス内に存在する
+      // exists in class, not extension
       expect(code, isNot(contains('extension ')));
-      // クラス定義がある
+      // class definition exists
       expect(code, contains('class TestTableRepository'));
     });
   });

@@ -370,7 +370,7 @@ class SchemaFetcher {
         final tableColumnsMap = await _fetchRpcTableColumns();
         merged = mergeTableColumns(merged, tableColumnsMap);
       } catch (_) {
-        // TABLE列情報の取得に失敗しても続行
+        // Continue even if TABLE column info fetch fails
       }
 
       // json_build_object 自動検出 (tableColumns未設定の関数のみ)
@@ -386,16 +386,16 @@ class SchemaFetcher {
           return func.copyWith(tableColumns: columns);
         }).toList();
       } catch (_) {
-        // JSON列自動検出の失敗は無視して続行
+        // Ignore JSON column auto-detection failure and continue
       }
 
-      // error text カラムを持つ関数のエラーコード自動検出
+      // Auto-detect error codes for functions with an error text column
       try {
         final errorCodesMap = await _fetchRpcErrorCodes();
         merged = merged.map((func) {
           final codes = errorCodesMap[func.name];
           if (codes == null) return func;
-          // error text カラムがあるか確認
+          // Check if the function has an error text column
           final hasErrorCol = func.tableColumns?.any(
             (c) =>
                 (c.name == 'error' || c.name == 'error_code') &&
@@ -405,10 +405,10 @@ class SchemaFetcher {
           return func.copyWith(errorCodes: codes);
         }).toList();
       } catch (_) {
-        // エラーコード自動検出の失敗は無視して続行
+        // Ignore error code auto-detection failure and continue
       }
 
-      // RETURNS TABLE の json カラムのネスト構造を検出
+      // Detect nested structure of json columns in RETURNS TABLE
       try {
         final nestedMap = await _fetchRpcNestedJsonColumns();
         merged = merged.map((func) {
@@ -429,7 +429,7 @@ class SchemaFetcher {
           return func.copyWith(tableColumns: updated);
         }).toList();
       } catch (_) {
-        // ネスト構造検出の失敗は無視して続行
+        // Ignore nested structure detection failure and continue
       }
 
       return merged;

@@ -19,7 +19,7 @@ void main() {
       );
     });
 
-    test('単一単語', () {
+    test('single word', () {
       expect(
         RpcResultModelGenerator.resultClassName('status'),
         'StatusResult',
@@ -28,7 +28,7 @@ void main() {
   });
 
   group('resultFileName', () {
-    test('関数名+_result.dart', () {
+    test('function_name + _result.dart', () {
       expect(
         RpcResultModelGenerator.resultFileName(
           'get_my_invite_code',
@@ -39,7 +39,7 @@ void main() {
   });
 
   group('generateResultModel', () {
-    test('tableColumnsがnullの場合はnull', () {
+    test('returns null when tableColumns is null', () {
       final func = RpcFunctionInfo(
         name: 'no_table',
         params: [],
@@ -49,7 +49,7 @@ void main() {
       expect(generator.generateResultModel(func), isNull);
     });
 
-    test('tableColumnsが空の場合はnull', () {
+    test('returns null when tableColumns is empty', () {
       final func = RpcFunctionInfo(
         name: 'empty_table',
         params: [],
@@ -61,7 +61,7 @@ void main() {
       expect(generator.generateResultModel(func), isNull);
     });
 
-    test('基本的なFreezedモデル生成', () {
+    test('generates basic Freezed model', () {
       final func = RpcFunctionInfo(
         name: 'get_my_invite_code',
         params: [],
@@ -150,7 +150,7 @@ void main() {
       );
     });
 
-    test('DateTime型の列', () {
+    test('DateTime column type', () {
       final func = RpcFunctionInfo(
         name: 'get_events',
         params: [],
@@ -177,7 +177,7 @@ void main() {
       );
     });
 
-    test('jsonb型の列はdynamic（RPC result modelのみ）', () {
+    test('jsonb column maps to dynamic (RPC result model only)', () {
       final func = RpcFunctionInfo(
         name: 'get_data',
         params: [],
@@ -193,26 +193,26 @@ void main() {
 
       final output = generator.generateResultModel(func)!;
 
-      // フィールド型は dynamic
+      // field type is dynamic
       expect(
         output,
         contains(
           'required dynamic metadata,',
         ),
       );
-      // fromRow で as キャストなし
+      // fromRow has no as cast
       expect(
         output,
         contains("metadata: row['metadata'],"),
       );
-      // as dynamic は冗長なので含まない
+      // as dynamic is redundant, should not be present
       expect(
         output,
         isNot(contains("as dynamic")),
       );
     });
 
-    test('json型の列もdynamic（json_agg等の配列対応）', () {
+    test('json column also maps to dynamic (for json_agg arrays)', () {
       final func = RpcFunctionInfo(
         name: 'get_detail',
         params: [],
@@ -235,7 +235,7 @@ void main() {
       );
     });
 
-    test('RETURNS TABLE に json/非json カラム混在', () {
+    test('RETURNS TABLE with mixed json/non-json columns', () {
       final func = RpcFunctionInfo(
         name: 'get_membership_rank_detail',
         params: [],
@@ -256,7 +256,7 @@ void main() {
 
       final output = generator.generateResultModel(func)!;
 
-      // text/int4 は通常の型マッピング
+      // text/int4 use standard type mapping
       expect(
         output,
         contains('required String rank,'),
@@ -265,12 +265,12 @@ void main() {
         output,
         contains('required int uploadDays,'),
       );
-      // json は dynamic
+      // json maps to dynamic
       expect(
         output,
         contains('required dynamic calendar,'),
       );
-      // fromRow: text/int4 は as キャスト
+      // fromRow: text/int4 have as cast
       expect(
         output,
         contains("rank: row['rank'] as String,"),
@@ -281,14 +281,14 @@ void main() {
           "uploadDays: row['upload_days'] as int,",
         ),
       );
-      // fromRow: json は as キャストなし
+      // fromRow: json has no as cast
       expect(
         output,
         contains("calendar: row['calendar'],"),
       );
     });
 
-    test('docコメントに関数名が含まれる', () {
+    test('doc comment includes function name', () {
       final func = RpcFunctionInfo(
         name: 'get_stats',
         params: [],
@@ -303,13 +303,13 @@ void main() {
 
       expect(
         output,
-        contains('/// `get_stats` RPC のレスポンスモデル。'),
+        contains('/// Response model for `get_stats` RPC.'),
       );
     });
   });
 
   group('generateAllResultModels', () {
-    test('tableColumnsを持つ関数のみ生成', () {
+    test('generates only for functions with tableColumns', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_invite_code',
@@ -353,7 +353,7 @@ void main() {
       );
     });
 
-    test('tableColumnsを持つ関数がない場合は空マップ', () {
+    test('returns empty map when no functions have tableColumns', () {
       final functions = [
         RpcFunctionInfo(
           name: 'simple_func',
@@ -369,7 +369,7 @@ void main() {
   });
 
   group('generateErrorClass', () {
-    test('sealed error class を生成', () {
+    test('generates sealed error class', () {
       final func = RpcFunctionInfo(
         name: 'execute_exchange_atomic',
         params: [],
@@ -439,7 +439,7 @@ void main() {
       expect(output, contains('.freezed.dart'));
     });
 
-    test('errorCodes が null なら null を返す', () {
+    test('returns null when errorCodes is null', () {
       final func = RpcFunctionInfo(
         name: 'get_data',
         params: [],
@@ -453,7 +453,7 @@ void main() {
       expect(generator.generateErrorClass(func), isNull);
     });
 
-    test('errorCodes が空なら null を返す', () {
+    test('returns null when errorCodes is empty', () {
       final func = RpcFunctionInfo(
         name: 'get_data',
         params: [],
@@ -470,7 +470,7 @@ void main() {
   });
 
   group('generateResultModel with errorCodes', () {
-    test('error カラムがエラー型に置換される', () {
+    test('error column is replaced with error type', () {
       final func = RpcFunctionInfo(
         name: 'execute_exchange_atomic',
         params: [],
@@ -494,14 +494,14 @@ void main() {
 
       final output = generator.generateResultModel(func)!;
 
-      // error フィールドはエラー型
+      // error field uses error type
       expect(
         output,
         contains(
           'required ExecuteExchangeAtomicError error,',
         ),
       );
-      // fromRow で fromErrorCode 変換
+      // fromRow uses fromErrorCode conversion
       expect(
         output,
         contains(
@@ -516,7 +516,7 @@ void main() {
           "import 'execute_exchange_atomic_error.dart'",
         ),
       );
-      // success は通常の bool
+      // success remains a normal bool
       expect(
         output,
         contains('required bool success,'),
@@ -525,7 +525,7 @@ void main() {
   });
 
   group('generateAllErrorClasses', () {
-    test('errorCodes を持つ関数のみ生成', () {
+    test('generates only for functions with errorCodes', () {
       final functions = [
         RpcFunctionInfo(
           name: 'execute_exchange',
@@ -570,7 +570,7 @@ void main() {
   });
 
   group('nested json column model generation', () {
-    test('json_agg カラムが List<NestedModel> になる', () {
+    test('json_agg column becomes List<NestedModel>', () {
       final func = RpcFunctionInfo(
         name: 'get_membership_rank_detail',
         params: [],
@@ -598,7 +598,7 @@ void main() {
 
       final output = generator.generateResultModel(func)!;
 
-      // フィールド型は List<NestedModel>
+      // field type is List<NestedModel>
       expect(
         output,
         contains(
@@ -607,7 +607,7 @@ void main() {
           ' calendar,',
         ),
       );
-      // fromRow で List<dynamic> をマッピング
+      // fromRow maps List<dynamic>
       expect(
         output,
         contains(
@@ -621,7 +621,7 @@ void main() {
           '.fromRow(',
         ),
       );
-      // ネストモデルクラスが同じファイルに生成
+      // nested model class generated in the same file
       expect(
         output,
         contains(
@@ -637,7 +637,7 @@ void main() {
         output,
         contains('required bool uploaded,'),
       );
-      // ネストモデルの fromRow
+      // nested model fromRow
       expect(
         output,
         contains(
@@ -651,14 +651,14 @@ void main() {
           "uploaded: row['uploaded'] as bool,",
         ),
       );
-      // 通常カラムは影響なし
+      // normal columns are unaffected
       expect(
         output,
         contains('required String rank,'),
       );
     });
 
-    test('nestedColumns なしの json は dynamic のまま', () {
+    test('json without nestedColumns remains dynamic', () {
       final func = RpcFunctionInfo(
         name: 'get_data',
         params: [],

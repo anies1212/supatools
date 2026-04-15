@@ -17,7 +17,7 @@ void main() {
   });
 
   group('EdgeFunctionDetector', () {
-    test('index.tsがあるディレクトリを検出', () async {
+    test('detects directories with index.ts', () async {
       // Setup: create two function directories with index.ts
       final func1Dir = Directory(p.join(basePath, 'send-email'));
       await func1Dir.create();
@@ -37,7 +37,7 @@ void main() {
       );
     });
 
-    test('_で始まるディレクトリは除外', () async {
+    test('excludes directories starting with _', () async {
       final funcDir = Directory(p.join(basePath, 'my-func'));
       await funcDir.create();
       await File(p.join(funcDir.path, 'index.ts')).create();
@@ -53,7 +53,7 @@ void main() {
       expect(functions[0].name, 'my-func');
     });
 
-    test('.で始まるディレクトリは除外', () async {
+    test('excludes directories starting with .', () async {
       final funcDir = Directory(p.join(basePath, 'my-func'));
       await funcDir.create();
       await File(p.join(funcDir.path, 'index.ts')).create();
@@ -69,7 +69,7 @@ void main() {
       expect(functions[0].name, 'my-func');
     });
 
-    test('index.tsがないディレクトリは無視', () async {
+    test('ignores directories without index.ts', () async {
       final funcDir = Directory(p.join(basePath, 'valid-func'));
       await funcDir.create();
       await File(p.join(funcDir.path, 'index.ts')).create();
@@ -85,7 +85,7 @@ void main() {
       expect(functions[0].name, 'valid-func');
     });
 
-    test('ディレクトリが存在しない場合は空リスト', () async {
+    test('returns empty list when directory does not exist', () async {
       final detector = EdgeFunctionDetector();
       final functions = await detector.detect(
         p.join(basePath, 'nonexistent'),
@@ -94,14 +94,14 @@ void main() {
       expect(functions, isEmpty);
     });
 
-    test('空のディレクトリの場合は空リスト', () async {
+    test('returns empty list for empty directory', () async {
       final detector = EdgeFunctionDetector();
       final functions = await detector.detect(basePath);
 
       expect(functions, isEmpty);
     });
 
-    test('結果はname順にソートされる', () async {
+    test('results are sorted by name', () async {
       for (final name in ['charlie', 'alpha', 'bravo']) {
         final dir = Directory(p.join(basePath, name));
         await dir.create();

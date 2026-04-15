@@ -12,7 +12,7 @@ void main() {
   });
 
   group('EdgeFunctionGenerator', () {
-    test('型定義なしクライアント生成', () {
+    test('generates client without type definitions', () {
       final functions = [
         EdgeFunctionInfo(name: 'send-email'),
         EdgeFunctionInfo(
@@ -48,7 +48,7 @@ void main() {
       );
     });
 
-    test('型定義ありクライアント生成（request + response）', () {
+    test('generates client with type definitions (request + response)', () {
       final functions = [
         EdgeFunctionInfo(name: 'send-email'),
       ];
@@ -121,7 +121,7 @@ void main() {
         output,
         contains('SendEmailResponse.fromJson(json)'),
       );
-      // response.dataの型を動的に判定するコードが含まれる
+      // contains code to dynamically check response.data type
       expect(output, contains('final data = response.data;'));
       expect(output, contains('data is List<int>'));
       expect(output, contains('utf8.decode(data)'));
@@ -131,7 +131,7 @@ void main() {
       );
     });
 
-    test('型定義あり（requestのみ）', () {
+    test('generates with type definitions (request only)', () {
       final functions = [
         EdgeFunctionInfo(name: 'notify'),
       ];
@@ -153,7 +153,7 @@ void main() {
       );
 
       expect(output, contains('class NotifyRequest'));
-      // responseがないのでFunctionResponse返却
+      // no response model so returns FunctionResponse
       expect(
         output,
         contains('Future<FunctionResponse> notify'),
@@ -164,7 +164,7 @@ void main() {
       );
     });
 
-    test('型定義なしと型定義ありの混在', () {
+    test('mixed typed and untyped functions', () {
       final functions = [
         EdgeFunctionInfo(name: 'untyped-func'),
         EdgeFunctionInfo(name: 'typed-func'),
@@ -200,7 +200,7 @@ void main() {
       );
     });
 
-    test('ヘッダーコメントとignore_for_fileが含まれる', () {
+    test('includes header comment and ignore_for_file', () {
       final output = generator.generateEdgeFunctionClient([]);
 
       expect(
@@ -225,14 +225,14 @@ void main() {
       );
     });
 
-    test('空の関数リストでも正常に生成', () {
+    test('generates correctly with empty function list', () {
       final output = generator.generateEdgeFunctionClient([]);
 
       expect(output, contains('class SupabaseEdgeFunctionClient'));
       expect(output, contains('const SupabaseEdgeFunctionClient'));
     });
 
-    test('モデルのtoJsonでoptionalフィールドはifガード付き', () {
+    test('model toJson uses if guard for optional fields', () {
       final functions = [
         EdgeFunctionInfo(name: 'test-func'),
       ];
@@ -271,7 +271,7 @@ void main() {
       );
     });
 
-    test('プロバイダーはインライン生成しない', () {
+    test('does not generate inline providers', () {
       final functions = [
         EdgeFunctionInfo(name: 'send-email'),
       ];
@@ -290,7 +290,7 @@ void main() {
   });
 
   group('EdgeFunctionGenerator.generateErrorClass', () {
-    test('Freezed sealed classが生成される', () {
+    test('generates Freezed sealed class', () {
       final errors = [
         EdgeFunctionErrorDef(
           code: 'outside_time_window',
@@ -395,7 +395,7 @@ void main() {
       );
     });
 
-    test('空のエラーリストでnullを返す', () {
+    test('returns null for empty error list', () {
       final output = generator.generateErrorClass(
         'test-func',
         [],
@@ -403,7 +403,7 @@ void main() {
       expect(output, isNull);
     });
 
-    test('単一エラーコードの場合', () {
+    test('single error code', () {
       final errors = [
         EdgeFunctionErrorDef(
           code: 'invalid_token',
@@ -428,7 +428,7 @@ void main() {
   });
 
   group('EdgeFunctionGenerator.generateErrorClasses', () {
-    test('エラー定義のある関数のみファイル生成', () {
+    test('generates files only for functions with error definitions', () {
       final modelDefs = {
         'submit-receipt': EdgeFunctionModelDef(
           errors: [
@@ -466,7 +466,7 @@ void main() {
       repoGenerator = RepositoryGenerator();
     });
 
-    test('client getterが生成される', () {
+    test('generates client getter', () {
       final table = TableInfo(
         name: 'users',
         columns: [
@@ -492,7 +492,7 @@ void main() {
       repoGenerator = RepositoryGenerator();
     });
 
-    test('引数なしの場合はsupabaseClientのみ', () {
+    test('generates only supabaseClient when no arguments', () {
       final output = repoGenerator.generateSupabaseClientProvider();
 
       expect(
@@ -514,7 +514,7 @@ void main() {
       );
     });
 
-    test('RPC + EdgeFunction 統合モード', () {
+    test('RPC + EdgeFunction unified mode', () {
       final output = repoGenerator.generateSupabaseClientProvider(
         rpcClientImport: 'package:data/rpc_client.dart',
         edgeFunctionClientImport: 'package:data/edge_function_client.dart',
@@ -552,7 +552,7 @@ void main() {
       repoGenerator = RepositoryGenerator();
     });
 
-    test('EdgeFunctionClient プロバイダーが含まれる', () {
+    test('includes EdgeFunctionClient provider', () {
       final output = repoGenerator.generateClientProviders(
         clientProviderImport:
             'package:gateway/supabase/supabase_client_provider.dart',
@@ -588,7 +588,7 @@ void main() {
       );
     });
 
-    test('RpcClient プロバイダーが含まれる', () {
+    test('includes RpcClient provider', () {
       final output = repoGenerator.generateClientProviders(
         clientProviderImport:
             'package:gateway/supabase/supabase_client_provider.dart',
@@ -607,7 +607,7 @@ void main() {
       );
     });
 
-    test('RPC + EdgeFunction 両方のプロバイダーが含まれる', () {
+    test('includes both RPC + EdgeFunction providers', () {
       final output = repoGenerator.generateClientProviders(
         clientProviderImport:
             'package:gateway/supabase/supabase_client_provider.dart',
@@ -623,14 +623,14 @@ void main() {
         output,
         contains('supabaseEdgeFunctionClient(Ref ref)'),
       );
-      // supabaseClientはこのファイルには含まれない
+      // supabaseClient is not in this file
       expect(
         output,
         isNot(contains('supabaseClient(Ref ref)')),
       );
     });
 
-    test('part指定がclient_providers.g.dartである', () {
+    test('part directive is client_providers.g.dart', () {
       final output = repoGenerator.generateClientProviders(
         clientProviderImport:
             'package:gateway/supabase/supabase_client_provider.dart',

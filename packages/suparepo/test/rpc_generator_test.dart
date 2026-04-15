@@ -10,7 +10,7 @@ void main() {
   });
 
   group('applyReturnTypeOverrides', () {
-    test('スカラー型の上書き', () {
+    test('scalar type override', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_invite_code',
@@ -29,7 +29,7 @@ void main() {
       expect(result[0].returnsSetOf, isFalse);
     });
 
-    test('setofプレフィックスでreturnsSetOfをtrue', () {
+    test('setof prefix sets returnsSetOf to true', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_items',
@@ -48,7 +48,7 @@ void main() {
       expect(result[0].returnsSetOf, isTrue);
     });
 
-    test('該当しない関数は変更なし', () {
+    test('unmatched functions remain unchanged', () {
       final functions = [
         RpcFunctionInfo(
           name: 'unrelated_func',
@@ -67,7 +67,7 @@ void main() {
       expect(result[0].returnsSetOf, isFalse);
     });
 
-    test('複数関数の上書き', () {
+    test('override multiple functions', () {
       final functions = [
         RpcFunctionInfo(
           name: 'func_a',
@@ -105,7 +105,7 @@ void main() {
       expect(result[2].returnsSetOf, isFalse);
     });
 
-    test('voidへの明示的な上書き', () {
+    test('explicit override to void', () {
       final functions = [
         RpcFunctionInfo(
           name: 'fire_and_forget',
@@ -126,7 +126,7 @@ void main() {
   });
 
   group('RpcGenerator', () {
-    test('パラメータあり関数のクライアント生成', () {
+    test('generates client for function with parameters', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_user_posts',
@@ -158,7 +158,7 @@ void main() {
       expect(output, contains('response.cast<Map<String, dynamic>>()'));
     });
 
-    test('setof関数はrawResponse→responseの正規化コードを生成', () {
+    test('setof function generates rawResponse to response normalization', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_items',
@@ -170,12 +170,12 @@ void main() {
 
       final output = generator.generateRpcClient(functions);
 
-      // rpc<dynamic> で呼び出し
+      // calls with rpc<dynamic>
       expect(
         output,
         contains("_client.rpc<dynamic>('get_items')"),
       );
-      // rawResponse を正規化して response に
+      // normalize rawResponse to response
       expect(
         output,
         contains(
@@ -185,7 +185,7 @@ void main() {
       );
     });
 
-    test('RETURNS TABLE + result model も rawResponse 正規化', () {
+    test('RETURNS TABLE + result model also normalizes rawResponse', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_rank_info',
@@ -207,12 +207,12 @@ void main() {
         generateResultModels: true,
       );
 
-      // rawResponse → response 正規化
+      // rawResponse to response normalization
       expect(
         output,
         contains('rawResponse is List'),
       );
-      // 正規化後に fromRow マッピング
+      // fromRow mapping after normalization
       expect(
         output,
         contains(
@@ -221,7 +221,7 @@ void main() {
       );
     });
 
-    test('パラメータなし関数のクライアント生成', () {
+    test('generates client for function without parameters', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_server_time',
@@ -239,11 +239,11 @@ void main() {
         output,
         contains("return await _client.rpc<DateTime>('get_server_time')"),
       );
-      // スカラー型はキャスト不要
+      // scalar types need no cast
       expect(output, isNot(contains('response as')));
     });
 
-    test('void戻り値のクライアント生成', () {
+    test('generates client for void return type', () {
       final functions = [
         RpcFunctionInfo(
           name: 'cleanup_old_data',
@@ -257,12 +257,12 @@ void main() {
 
       expect(output, contains('Future<void>'));
       expect(output, contains('cleanupOldData'));
-      // void戻り値はresponse変数を含まない
+      // void return type does not include response variable
       expect(output, isNot(contains('final response')));
       expect(output, contains("await _client.rpc<void>('cleanup_old_data')"));
     });
 
-    test('スカラー戻り値のクライアント生成', () {
+    test('generates client for scalar return type', () {
       final functions = [
         RpcFunctionInfo(
           name: 'count_active_users',
@@ -281,7 +281,7 @@ void main() {
       );
     });
 
-    test('setof戻り値（スカラー型）のクライアント生成', () {
+    test('generates client for setof scalar return type', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_all_ids',
@@ -297,7 +297,7 @@ void main() {
       expect(output, contains('response.cast<String>()'));
     });
 
-    test('snake_case→camelCase変換', () {
+    test('snake_case to camelCase conversion', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_user_by_email_address',
@@ -323,7 +323,7 @@ void main() {
       expect(output, contains('getUserByEmailAddress'));
       expect(output, contains('required String emailAddress'));
       expect(output, contains('bool? includeDeleted'));
-      // パラメータマップではsnake_caseを使用
+      // parameter map uses snake_case
       expect(output, contains("'email_address': emailAddress"));
       expect(
         output,
@@ -331,7 +331,7 @@ void main() {
       );
     });
 
-    test('予約語エスケープ', () {
+    test('reserved word escaping', () {
       final functions = [
         RpcFunctionInfo(
           name: 'do_something',
@@ -353,12 +353,12 @@ void main() {
 
       final output = generator.generateRpcClient(functions);
 
-      // 予約語は$サフィックスでエスケープ
+      // reserved words are escaped with $ suffix
       expect(output, contains(r'class$'));
       expect(output, contains(r'default$'));
     });
 
-    test('optionalパラメータはif付きで出力', () {
+    test('optional parameters are output with if guard', () {
       final functions = [
         RpcFunctionInfo(
           name: 'search',
@@ -388,7 +388,7 @@ void main() {
       );
     });
 
-    test('boolean戻り値のクライアント生成', () {
+    test('generates client for boolean return type', () {
       final functions = [
         RpcFunctionInfo(
           name: 'is_active_user',
@@ -414,7 +414,7 @@ void main() {
       );
     });
 
-    test('複数関数のクライアント生成', () {
+    test('generates client for multiple functions', () {
       final functions = [
         RpcFunctionInfo(
           name: 'func_a',
@@ -436,7 +436,7 @@ void main() {
       expect(output, contains('funcB'));
     });
 
-    test('ヘッダーコメントが含まれる', () {
+    test('includes header comment', () {
       final output = generator.generateRpcClient([]);
 
       expect(
@@ -450,7 +450,7 @@ void main() {
       );
     });
 
-    test('プロバイダーはインライン生成しない', () {
+    test('does not generate inline providers', () {
       final functions = [
         RpcFunctionInfo(
           name: 'test_func',
@@ -469,7 +469,7 @@ void main() {
   });
 
   group('RpcGenerator (DateTime serialization)', () {
-    test('date型パラメータはdate部分のみの文字列に変換', () {
+    test('date parameter is converted to date-only string', () {
       final functions = [
         RpcFunctionInfo(
           name: 'toggle_receipt_for_date',
@@ -496,7 +496,7 @@ void main() {
       );
     });
 
-    test('timestamp型パラメータはISO8601文字列に変換', () {
+    test('timestamp parameter is converted to ISO8601 string', () {
       final functions = [
         RpcFunctionInfo(
           name: 'log_event',
@@ -521,7 +521,7 @@ void main() {
       );
     });
 
-    test('timestamptz型パラメータはISO8601文字列に変換', () {
+    test('timestamptz parameter is converted to ISO8601 string', () {
       final functions = [
         RpcFunctionInfo(
           name: 'schedule_task',
@@ -547,7 +547,7 @@ void main() {
       );
     });
 
-    test('optionalなdate型パラメータは?.で安全にアクセス', () {
+    test('optional date parameter uses ?. for safe access', () {
       final functions = [
         RpcFunctionInfo(
           name: 'filter_by_date',
@@ -575,7 +575,7 @@ void main() {
       );
     });
 
-    test('非DateTime型パラメータはそのまま渡される', () {
+    test('non-DateTime parameters are passed as-is', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_user',
@@ -602,7 +602,7 @@ void main() {
   });
 
   group('RpcGenerator (generateResultModels)', () {
-    test('tableColumnsを持つ関数は型付き戻り値', () {
+    test('functions with tableColumns get typed return values', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_my_invite_code',
@@ -640,7 +640,7 @@ void main() {
           '.map(GetMyInviteCodeResult.fromRow).toList()',
         ),
       );
-      // importが追加される
+      // import is added
       expect(
         output,
         contains(
@@ -649,7 +649,7 @@ void main() {
       );
     });
 
-    test('tableColumnsがない関数は従来通り', () {
+    test('functions without tableColumns use legacy format', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_user_posts',
@@ -674,7 +674,7 @@ void main() {
       );
     });
 
-    test('generateResultModels=falseならtableColumnsを無視', () {
+    test('ignores tableColumns when generateResultModels=false', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_data',
@@ -702,7 +702,7 @@ void main() {
       );
     });
 
-    test('型付きとMap混在', () {
+    test('mixed typed and Map return types', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_invite_code',
@@ -740,7 +740,7 @@ void main() {
         contains('Future<List<Map<String, dynamic>>>'),
       );
       expect(output, contains('Future<int>'));
-      // 型付き関数のimportのみ
+      // only typed function imports
       expect(
         output,
         contains("import 'get_invite_code_result.dart'"),
@@ -753,7 +753,7 @@ void main() {
       );
     });
 
-    test('resultModelsImportPrefixが適用される', () {
+    test('resultModelsImportPrefix is applied', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_stats',
@@ -780,7 +780,7 @@ void main() {
       );
     });
 
-    test('パラメータ付き型付き関数', () {
+    test('typed function with parameters', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_user_stats',
@@ -820,7 +820,7 @@ void main() {
         ),
       );
     });
-    test('returns json + YAML result_models → 単一モデル返却', () {
+    test('returns json + YAML result_models returns single model', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_membership_rank_info',
@@ -852,7 +852,7 @@ void main() {
         generateResultModels: true,
       );
 
-      // 単一オブジェクト返却 (not List)
+      // single object return (not List)
       expect(
         output,
         contains(
@@ -860,12 +860,12 @@ void main() {
           'getMembershipRankInfo',
         ),
       );
-      // rpc<Map<String, dynamic>> で呼び出し
+      // calls with rpc<Map<String, dynamic>>
       expect(
         output,
         contains("rpc<Map<String, dynamic>>"),
       );
-      // fromRow で直接変換 (not .map().toList())
+      // direct fromRow conversion (not .map().toList())
       expect(
         output,
         contains(
@@ -885,7 +885,7 @@ void main() {
       );
     });
 
-    test('returns json + result_models パラメータなし', () {
+    test('returns json + result_models without parameters', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_app_config',
@@ -920,7 +920,7 @@ void main() {
       );
     });
 
-    test('setof json + result_models → List<Model>返却', () {
+    test('setof json + result_models returns List<Model>', () {
       final functions = [
         RpcFunctionInfo(
           name: 'get_rankings',

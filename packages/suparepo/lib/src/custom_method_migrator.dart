@@ -1,22 +1,22 @@
 import 'package:recase/recase.dart';
 
-/// カスタムメソッドの情報
+/// Custom method information
 class MethodInfo {
-  /// メソッド名
+  /// Method name
   final String name;
 
-  /// ソースコード全文（コメント・アノテーション含む）
+  /// Full source code (including comments and annotations)
   final String source;
 
   const MethodInfo({required this.name, required this.source});
 }
 
-/// カスタムメソッド抽出結果
+/// Custom method extraction result
 class MigrationResult {
   final List<MethodInfo> customMethods;
   final List<String> customImports;
 
-  /// カスタムメソッドが参照するprivate field
+  /// Private fields referenced by custom methods
   final List<MethodInfo> privateFields;
 
   const MigrationResult({
@@ -28,18 +28,18 @@ class MigrationResult {
   bool get hasCustomCode => customMethods.isNotEmpty;
 }
 
-/// .custom.dartファイルから抽出した埋め込み用コンテンツ
+/// Content extracted from .custom.dart file for embedding
 class CustomFileContent {
-  /// extension本体（`{ }` の中身）
+  /// Extension body (contents inside `{ }`)
   final String body;
 
-  /// 生成ファイルに追加するimport文
+  /// Import statements to add to the generated file
   final List<String> imports;
 
   const CustomFileContent({required this.body, required this.imports});
 }
 
-/// 既存extensionファイルとのマージ結果
+/// Merge result with existing extension file
 class MergeResult {
   final String mergedCode;
   final List<String> added;
@@ -52,10 +52,10 @@ class MergeResult {
   });
 }
 
-/// 既存リポジトリファイルからカスタムメソッドを抽出し、
-/// extensionファイルへ移行するクラス
+/// Extracts custom methods from existing repository files
+/// and migrates them to extension files
 class CustomMethodMigrator {
-  /// 標準メソッド名のパターン（これらは移行対象外）
+  /// Standard method name patterns (these are excluded from migration)
   static const _standardMethodNames = {
     'getAll',
     'getById',
@@ -66,39 +66,39 @@ class CustomMethodMigrator {
     'paginate',
   };
 
-  /// 標準getter名
+  /// Standard getter names
   static const _standardGetterNames = {
     'tableName',
     'client',
   };
 
-  /// getAllWith{Relation}のパターン
+  /// Pattern for getAllWith{Relation}
   static final _relationMethodPattern = RegExp(r'^getAllWith\w+$');
 
-  /// メソッドシグネチャからメソッド名を抽出
-  /// `>` or whitespace の直後にある identifier + `(` or `<` を検出
+  /// Extract method name from method signature
+  /// Detects identifier + `(` or `<` immediately after `>` or whitespace
   static final _methodNamePattern = RegExp(
     r'[\s>]\s*(\w+)\s*[<(]',
   );
 
-  /// getterシグネチャからgetter名を抽出
+  /// Extract getter name from getter signature
   static final _getterPattern = RegExp(
     r'(?:\w+(?:<[^>]*>)?)\s+get\s+(\w+)\b',
   );
 
-  /// 自動生成ファイルの既知importパターン
+  /// Known import patterns for auto-generated files
   static final _generatedImportPatterns = [
     RegExp(r"^import\s+'package:supabase"),
     RegExp(r"^import\s+'package:riverpod_annotation"),
     RegExp(r"^part\s+'"),
   ];
 
-  /// カスタムメソッド用の拡張ファイル名を取得
+  /// Get the extension file name for custom methods
   String getCustomFileName(String tableName) {
     return '${ReCase(tableName).snakeCase}_repository.custom.dart';
   }
 
-  /// 既存ファイルからカスタムメソッドを抽出
+  /// Extract custom methods from existing file
   MigrationResult extractCustomMethods(
     String sourceCode,
     String className,
@@ -118,11 +118,11 @@ class CustomMethodMigrator {
     final customMethods = <MethodInfo>[];
     final privateFields = <String, String>{}; // name → source
 
-    // Phase 1: メンバーを分類
+    // Phase 1: Classify members
     for (final member in members) {
       if (_isStandardMember(member, className)) continue;
 
-      // private static field の検出
+      // Detect private static field
       final fieldName = _extractPrivateFieldName(member);
       if (fieldName != null) {
         privateFields[fieldName] = member;
@@ -134,7 +134,7 @@ class CustomMethodMigrator {
       customMethods.add(MethodInfo(name: name, source: member));
     }
 
-    // Phase 2: カスタムメソッドが参照するprivate fieldを特定
+    // Phase 2: Identify private fields referenced by custom methods
     final referencedFields = <MethodInfo>[];
     for (final entry in privateFields.entries) {
       final fieldName = entry.key;
@@ -155,7 +155,7 @@ class CustomMethodMigrator {
     );
   }
 
-  /// extensionファイルのコードを生成
+  /// Generate extension file code
   String generateExtensionFile({
     required String className,
     required String repositoryFileName,
@@ -179,7 +179,7 @@ class CustomMethodMigrator {
     );
     buffer.writeln();
 
-    // メソッド本体で参照されているimportのみ出力
+    // Only output imports referenced in method bodies
     final allSources = [
       ...methods.map((m) => m.source),
       ...privateFields.map((f) => f.source),
@@ -200,7 +200,7 @@ class CustomMethodMigrator {
 
     buffer.writeln('extension ${className}Custom on $className {');
 
-    // private fieldsをstatic定数として出力
+    // Output private fields as static constants
     for (final field in privateFields) {
       buffer.write(field.source);
       buffer.writeln();
@@ -220,25 +220,25 @@ class CustomMethodMigrator {
     return buffer.toString();
   }
 
-  /// .custom.dartファイル（extension形式）からメソッドとimportを抽出。
-  /// 生成されたリポジトリクラスに埋め込むために使用する。
+  /// Extract methods and imports from .custom.dart file (extension format).
+  /// Used for embedding into the generated repository class.
   CustomFileContent? extractFromCustomFile(
     String customCode,
     String repositoryFileName,
   ) {
     final allImports = _extractImports(customCode);
     final imports = allImports.where((imp) {
-      // 自身のリポジトリimportを除外
+      // Exclude self repository import
       if (imp.contains(repositoryFileName)) return false;
-      // 標準的な自動生成importを除外
+      // Exclude standard auto-generated imports
       for (final pattern in _generatedImportPatterns) {
         if (pattern.hasMatch(imp)) return false;
       }
-      // supabaseClientProviderのimportを除外
+      // Exclude supabaseClientProvider import
       if (imp.contains('supabase_client_provider')) return false;
-      // supabase_flutter importは生成ファイルに含まれるため除外
+      // Exclude supabase_flutter import as it is included in generated file
       if (imp.contains('package:supabase')) return false;
-      // model importは生成ファイルに含まれるため除外
+      // Exclude model import as it is included in generated file
       if (imp.contains('.supafreeze.dart')) return false;
       return true;
     }).toList();
@@ -249,7 +249,7 @@ class CustomMethodMigrator {
     return CustomFileContent(body: body, imports: imports);
   }
 
-  /// 既存のextensionファイルとマージ
+  /// Merge with existing extension file
   MergeResult mergeWithExisting(
     String existingCustomCode,
     List<MethodInfo> newMethods,
@@ -276,7 +276,7 @@ class CustomMethodMigrator {
       );
     }
 
-    // extensionの閉じ括弧の前に新規メソッドを挿入
+    // Insert new methods before the closing brace of the extension
     final closingIndex = existingCustomCode.lastIndexOf('}');
     if (closingIndex == -1) {
       return MergeResult(
@@ -305,7 +305,7 @@ class CustomMethodMigrator {
 
   // --- Private helpers ---
 
-  /// import文をすべて抽出
+  /// Extract all import statements
   List<String> _extractImports(String source) {
     final imports = <String>[];
     for (final line in source.split('\n')) {
@@ -317,21 +317,21 @@ class CustomMethodMigrator {
     return imports;
   }
 
-  /// カスタムimportのみフィルタリング
+  /// Filter custom imports only
   List<String> _filterCustomImports(List<String> imports) {
     return imports.where((imp) {
       for (final pattern in _generatedImportPatterns) {
         if (pattern.hasMatch(imp)) return false;
       }
-      // モデルimportもスキップ（.supafreeze.dartを含む）
+      // Skip model imports (containing .supafreeze.dart)
       if (imp.contains('.supafreeze.dart')) return false;
-      // メインのsupabaseクライアントimport
+      // Main supabase client import
       if (imp.contains('supabase_client_provider')) return false;
       return true;
     }).toList();
   }
 
-  /// クラス本体を抽出（`class ClassName {` から対応する `}` まで）
+  /// Extract class body (from `class ClassName {` to the matching `}`)
   String? _extractClassBody(String source, String className) {
     final classPattern = RegExp(
       'class\\s+${RegExp.escape(className)}\\s*\\{',
@@ -339,13 +339,13 @@ class CustomMethodMigrator {
     return _extractBodyAfterBrace(source, classPattern);
   }
 
-  /// extension本体を抽出
+  /// Extract extension body
   String? _extractExtensionBody(String source) {
     final pattern = RegExp(r'extension\s+\w+\s+on\s+\w+\s*\{');
     return _extractBodyAfterBrace(source, pattern);
   }
 
-  /// 開始パターンにマッチする `{` から対応する `}` までの本体を抽出
+  /// Extract body from the `{` matching the start pattern to its corresponding `}`
   String? _extractBodyAfterBrace(String source, RegExp pattern) {
     final match = pattern.firstMatch(source);
     if (match == null) return null;
@@ -420,37 +420,37 @@ class CustomMethodMigrator {
 
     if (depth != 0) return null;
 
-    // iは閉じ括弧の次の位置。本体は startIndex から i-1(閉じ括弧)の手前まで
+    // i is the position after the closing brace. Body is from startIndex to i-1 (before closing brace)
     return source.substring(startIndex, i - 1);
   }
 
-  /// クラス本体からトップレベルメンバーを抽出
+  /// Extract top-level members from class body
   ///
-  /// 波括弧と括弧の両方をトラッキングし、
-  /// 名前付きパラメータの`{}`を正しく処理する。
+  /// Tracks both braces and parentheses,
+  /// correctly handling `{}` in named parameters.
   List<String> _extractMembers(String classBody) {
     final members = <String>[];
     final lines = classBody.split('\n');
 
-    // Phase 1: 行ごとにメタ情報を付与
-    // Phase 2: メンバー境界を検出
+    // Phase 1: Annotate each line with metadata
+    // Phase 2: Detect member boundaries
 
     var i = 0;
 
     while (i < lines.length) {
       final trimmed = lines[i].trim();
 
-      // 空行スキップ
+      // Skip empty lines
       if (trimmed.isEmpty) {
         i++;
         continue;
       }
 
-      // コメント・アノテーション行の蓄積
+      // Accumulate comment and annotation lines
       if (trimmed.startsWith('///') ||
           trimmed.startsWith('//') ||
           trimmed.startsWith('@')) {
-        // 先読み: コメント/アノテーションブロックの開始位置を記録
+        // Lookahead: record the start position of comment/annotation block
         final commentStart = i;
         while (i < lines.length) {
           final t = lines[i].trim();
@@ -465,16 +465,16 @@ class CustomMethodMigrator {
         }
         if (i >= lines.length) break;
 
-        // コメント直後のコード行の処理
+        // Process the code line immediately after comments
         final codeLine = lines[i].trim();
         if (_isFieldDeclaration(codeLine) ||
             _isConstructorLine(codeLine)) {
-          // フィールド/コンストラクタ → スキップ
+          // Field/constructor -> skip
           i = _skipMemberBlock(lines, i);
           continue;
         }
 
-        // メソッド/getterの開始 → コメントごと収集
+        // Method/getter start -> collect including comments
         final memberLines = <String>[];
         for (var j = commentStart; j < i; j++) {
           memberLines.add(lines[j]);
@@ -487,19 +487,19 @@ class CustomMethodMigrator {
         continue;
       }
 
-      // フィールド宣言のスキップ
+      // Skip field declarations
       if (_isFieldDeclaration(trimmed)) {
         i++;
         continue;
       }
 
-      // コンストラクタのスキップ
+      // Skip constructors
       if (_isConstructorLine(trimmed)) {
         i = _skipMemberBlock(lines, i);
         continue;
       }
 
-      // メソッド/getterの開始
+      // Method/getter start
       final memberLines = <String>[];
       i = _collectMemberBody(lines, i, memberLines);
       final memberStr = memberLines.join('\n').trimRight();
@@ -511,7 +511,7 @@ class CustomMethodMigrator {
     return members;
   }
 
-  /// メンバーの本体を収集し、終了後の行インデックスを返す
+  /// Collect member body and return the line index after completion
   int _collectMemberBody(
     List<String> lines,
     int startIndex,
@@ -526,7 +526,7 @@ class CustomMethodMigrator {
       final line = lines[i];
       output.add(line);
 
-      // 文字単位でトラッキング
+      // Track character by character
       final result = _scanLine(
         line,
         braceDepth,
@@ -539,13 +539,13 @@ class CustomMethodMigrator {
 
       i++;
 
-      // 本体波括弧なしでセミコロン終了（フィールド宣言、アロー関数等）
+      // Ends with semicolon without body brace (field declarations, arrow functions, etc.)
       final trimmed = line.trim();
       if (!foundBodyBrace && trimmed.endsWith(';')) {
         break;
       }
 
-      // 本体の波括弧が見つかって閉じたら終了
+      // End when body brace is found and closed
       if (foundBodyBrace && braceDepth <= 0) {
         break;
       }
@@ -554,7 +554,7 @@ class CustomMethodMigrator {
     return i;
   }
 
-  /// メンバーブロックをスキップし、終了後の行インデックスを返す
+  /// Skip member block and return the line index after completion
   int _skipMemberBlock(List<String> lines, int startIndex) {
     var braceDepth = 0;
     var parenDepth = 0;
@@ -576,17 +576,17 @@ class CustomMethodMigrator {
       i++;
 
       final trimmed = line.trim();
-      // 1行で完結する場合（`;`で終わる）
+      // Single-line case (ends with `;`)
       if (!foundBodyBrace && trimmed.endsWith(';')) break;
 
-      // 本体の波括弧が閉じたら終了
+      // End when body brace is closed
       if (foundBodyBrace && braceDepth <= 0) break;
     }
 
     return i;
   }
 
-  /// 行をスキャンして波括弧・括弧の深さを更新
+  /// Scan a line and update brace/parenthesis depth
   _ScanResult _scanLine(
     String line,
     int braceDepth,
@@ -600,7 +600,7 @@ class CustomMethodMigrator {
       final char = line[ci];
       final nextChar = ci + 1 < line.length ? line[ci + 1] : '';
 
-      // 文字列内
+      // Inside string
       if (inString) {
         if (char == '\\') {
           ci++;
@@ -613,28 +613,28 @@ class CustomMethodMigrator {
         continue;
       }
 
-      // コメント開始
+      // Comment start
       if (char == '/' && nextChar == '/') break;
       if (char == '/' && nextChar == '*') {
-        // ブロックコメントは行末まで簡易スキップ
+        // Simple skip block comment to end of line
         break;
       }
 
-      // 文字列開始
+      // String start
       if (char == "'" || char == '"') {
         inString = true;
         stringChar = char;
         continue;
       }
 
-      // 括弧トラッキング
+      // Parenthesis tracking
       if (char == '(') parenDepth++;
       if (char == ')') parenDepth--;
 
-      // 波括弧: 括弧内の`{}`はメソッド本体ではない
+      // Braces: `{}` inside parentheses are not method body
       if (char == '{') {
         if (parenDepth > 0) {
-          // 名前付きパラメータ内 → 無視
+          // Inside named parameters -> ignore
           continue;
         }
         braceDepth++;
@@ -653,7 +653,7 @@ class CustomMethodMigrator {
     );
   }
 
-  /// フィールド宣言かどうか
+  /// Whether this is a field declaration
   bool _isFieldDeclaration(String trimmed) {
     if (trimmed.startsWith('final ') && trimmed.endsWith(';')) return true;
     if (trimmed.startsWith('late ') && trimmed.endsWith(';')) return true;
@@ -663,7 +663,7 @@ class CustomMethodMigrator {
     return false;
   }
 
-  /// コンストラクタ行かどうか
+  /// Whether this is a constructor line
   bool _isConstructorLine(String trimmed) {
     return RegExp(r'^(?:const\s+)?\w+(?:\._?)?\s*\(').hasMatch(trimmed) &&
         !trimmed.contains('Future') &&
@@ -672,19 +672,19 @@ class CustomMethodMigrator {
         !trimmed.contains(' get ');
   }
 
-  /// メンバーが標準メンバーかどうか判定
+  /// Determine whether a member is a standard member
   bool _isStandardMember(String memberSource, String className) {
-    // コメント・アノテーション行を除いたシグネチャ行を取得
+    // Get signature line excluding comment and annotation lines
     final signatureLine = _getSignatureLine(memberSource);
 
-    // getterチェック
+    // Getter check
     final getterMatch = _getterPattern.firstMatch(signatureLine);
     if (getterMatch != null) {
       final name = getterMatch.group(1)!;
       return _standardGetterNames.contains(name);
     }
 
-    // メソッドチェック
+    // Method check
     final methodMatch = _methodNamePattern.firstMatch(signatureLine);
     if (methodMatch != null) {
       final name = methodMatch.group(1)!;
@@ -695,7 +695,7 @@ class CustomMethodMigrator {
     return false;
   }
 
-  /// メンバーソースからシグネチャ行（最初の非コメント・非アノテーション行）を取得
+  /// Get the signature line (first non-comment, non-annotation line) from member source
   String _getSignatureLine(String memberSource) {
     for (final line in memberSource.split('\n')) {
       final trimmed = line.trim();
@@ -708,20 +708,20 @@ class CustomMethodMigrator {
     return '';
   }
 
-  /// private fieldの名前を抽出（`_`で始まるフィールド宣言）
+  /// Extract private field name (field declarations starting with `_`)
   static final _privateFieldPattern = RegExp(
     r'(?:static\s+)?(?:const\s+|final\s+|late\s+)'
     r'(?:\w+(?:<[^>]*>)?\s+)?(_\w+)\s*[=;]',
   );
 
-  /// メンバーソースからprivate field名を抽出
+  /// Extract private field name from member source
   String? _extractPrivateFieldName(String memberSource) {
     final signatureLine = _getSignatureLine(memberSource);
     final match = _privateFieldPattern.firstMatch(signatureLine);
     return match?.group(1);
   }
 
-  /// メンバーソースからメソッド/getter名を抽出
+  /// Extract method/getter name from member source
   String? _extractMemberName(String memberSource) {
     final signatureLine = _getSignatureLine(memberSource);
 
@@ -734,23 +734,24 @@ class CustomMethodMigrator {
     return null;
   }
 
-  /// メソッドソースの `_client` を `client` に置換
+  /// Replace `_client` with `client` in method source
   String _migrateMethodSource(String source) {
     return source.replaceAll(RegExp(r'\b_client\b'), 'client');
   }
 
-  /// importパスがソースコード内で参照されているか判定。
+  /// Determine whether an import path is referenced in the source code.
   ///
-  /// import先のパッケージが export する型名を直接チェックするのは困難なため、
-  /// Dart の慣例（`SupabaseClient` 等の型名が `package:supabase` 由来）に基づき
-  /// ソースに型名が出現しない ≒ import不要 と判定する簡易ヒューリスティック。
+  /// Since it is difficult to directly check type names exported by
+  /// the imported package, this uses a simple heuristic based on Dart
+  /// conventions (e.g., `SupabaseClient` originates from `package:supabase`)
+  /// where absence of type names in source ~ import is unnecessary.
   bool _isImportReferenced(String importPath, String source) {
-    // supabase系: SupabaseClient, CountOption 等の型名が出現するか
+    // supabase-related: check if type names like SupabaseClient, CountOption appear
     if (importPath.contains('package:supabase')) {
       return RegExp(r'\bSupabaseClient\b').hasMatch(source) ||
           RegExp(r'\bCountOption\b').hasMatch(source);
     }
-    // supafreeze model: ファイル名からクラス名を推定して出現チェック
+    // supafreeze model: infer class name from file name and check for occurrence
     if (importPath.contains('.supafreeze.dart')) {
       final fileName = importPath.split('/').last;
       final baseName = fileName.replaceAll('.supafreeze.dart', '');
@@ -758,12 +759,12 @@ class CustomMethodMigrator {
       final className = ReCase(baseName).pascalCase;
       return RegExp('\\b$className\\b(?!Repository|Custom)').hasMatch(source);
     }
-    // それ以外は常に必要とみなす
+    // All others are considered always necessary
     return true;
   }
 
-  /// 既存の `.custom.dart` ファイルから未使用importを除去した
-  /// コードを返す。メソッド本体で参照されていないimportを削除する。
+  /// Return code from the existing `.custom.dart` file with unused imports
+  /// removed. Deletes imports not referenced in method bodies.
   String? cleanupCustomFileImports(String customCode) {
     final body = _extractExtensionBody(customCode);
     if (body == null) return null;
@@ -775,12 +776,12 @@ class CustomMethodMigrator {
     for (final line in lines) {
       final trimmed = line.trim();
       if (trimmed.startsWith('import ')) {
-        // repositoryの自己importは常に保持
+        // Always keep the repository self-import
         if (trimmed.contains('_repository.dart')) {
           cleaned.add(line);
           continue;
         }
-        // import先がbodyで参照されているか判定
+        // Determine if the import target is referenced in the body
         final pathMatch = RegExp(
           r"import\s+'([^']+)'",
         ).firstMatch(trimmed);
@@ -788,7 +789,7 @@ class CustomMethodMigrator {
           final importPath = pathMatch.group(1)!;
           if (!_isImportReferenced(importPath, body)) {
             modified = true;
-            continue; // 未使用import → 除去
+            continue; // Unused import -> remove
           }
         }
         cleaned.add(line);
@@ -801,7 +802,7 @@ class CustomMethodMigrator {
     return cleaned.join('\n');
   }
 
-  /// 既存extensionファイルからメソッド名を抽出
+  /// Extract method names from existing extension file
   Set<String> _extractExistingMethodNames(String extensionCode) {
     final names = <String>{};
     for (final line in extensionCode.split('\n')) {
@@ -832,7 +833,7 @@ class CustomMethodMigrator {
   }
 }
 
-/// 行スキャン結果
+/// Line scan result
 class _ScanResult {
   final int braceDepth;
   final int parenDepth;

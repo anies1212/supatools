@@ -304,6 +304,11 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     return 0;
   }
 
+  // Surface non-fatal warnings (e.g. execute_sql introspection failures)
+  for (final warning in fetcher.warnings) {
+    print('⚠️  $warning');
+  }
+
   // Override with YAML return_types (YAML takes highest priority)
   final returnTypes = config.rpc.returnTypes;
   if (returnTypes != null) {

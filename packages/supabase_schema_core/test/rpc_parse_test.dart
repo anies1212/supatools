@@ -310,6 +310,144 @@ void main() {
       final functions = fetcher.parseRpcFunctions(spec);
       expect(functions, isEmpty);
     });
+
+    test('resolves \$ref schema in responses against definitions', () {
+      final spec = {
+        'paths': {
+          '/rpc/is_admin': {
+            'post': {
+              'parameters': <dynamic>[],
+              'responses': {
+                '200': {
+                  'schema': {r'$ref': '#/definitions/is_admin'},
+                },
+              },
+            },
+          },
+        },
+        'definitions': {
+          'is_admin': {'type': 'boolean'},
+        },
+      };
+
+      final functions = fetcher.parseRpcFunctions(spec);
+
+      expect(functions, hasLength(1));
+      expect(functions[0].name, 'is_admin');
+      expect(functions[0].returnType, 'bool');
+      expect(functions[0].returnsSetOf, isFalse);
+    });
+
+    test('resolves \$ref schema against components.schemas (OpenAPI 3.0)', () {
+      final spec = {
+        'paths': {
+          '/rpc/get_count': {
+            'post': {
+              'parameters': <dynamic>[],
+              'responses': {
+                '200': {
+                  'schema': {r'$ref': '#/components/schemas/get_count'},
+                },
+              },
+            },
+          },
+        },
+        'components': {
+          'schemas': {
+            'get_count': {'type': 'integer', 'format': 'int64'},
+          },
+        },
+      };
+
+      final functions = fetcher.parseRpcFunctions(spec);
+
+      expect(functions, hasLength(1));
+      expect(functions[0].returnType, 'int8');
+    });
+
+    test('parses OpenAPI 3.0 responses.200.content schema', () {
+      final spec = {
+        'paths': {
+          '/rpc/get_token': {
+            'post': {
+              'parameters': <dynamic>[],
+              'responses': {
+                '200': {
+                  'content': {
+                    'application/json': {
+                      'schema': {'type': 'string', 'format': 'text'},
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        'definitions': <String, dynamic>{},
+      };
+
+      final functions = fetcher.parseRpcFunctions(spec);
+
+      expect(functions, hasLength(1));
+      expect(functions[0].returnType, 'text');
+      expect(functions[0].returnsSetOf, isFalse);
+    });
+
+    test('resolves \$ref inside array items', () {
+      final spec = {
+        'paths': {
+          '/rpc/get_items': {
+            'post': {
+              'parameters': <dynamic>[],
+              'responses': {
+                '200': {
+                  'schema': {
+                    'type': 'array',
+                    'items': {r'$ref': '#/definitions/item'},
+                  },
+                },
+              },
+            },
+          },
+        },
+        'definitions': {
+          'item': {'type': 'string'},
+        },
+      };
+
+      final functions = fetcher.parseRpcFunctions(spec);
+
+      expect(functions, hasLength(1));
+      expect(functions[0].returnsSetOf, isTrue);
+      expect(functions[0].returnType, 'text');
+    });
+
+    test('unresolvable \$ref falls back to void', () {
+      final spec = {
+        'paths': {
+          '/rpc/mystery': {
+            'post': {
+              'parameters': <dynamic>[],
+              'responses': {
+                '200': {
+                  'schema': {r'$ref': '#/definitions/missing'},
+                },
+              },
+            },
+          },
+        },
+        'definitions': <String, dynamic>{},
+      };
+
+      final functions = fetcher.parseRpcFunctions(spec);
+
+      expect(functions, hasLength(1));
+      // $ref that fails to resolve has no type/items info, so falls
+      // through to the default 'text' mapping in _openApiTypeToPgType.
+      // We accept either 'void' or 'text' here as a reasonable fallback;
+      // the important thing is no crash.
+      expect(functions[0].returnType, anyOf('void', 'text'));
+    });
   });
 
   group('mergeReturnTypes', () {

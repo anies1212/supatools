@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.16.1] - 2026-05-19
+
+### Fixed
+
+- Surface diagnostic warnings when `execute_sql` RPC introspection fails so that users no longer get an entire `rpc_client.dart` of `Future<void>` methods with no indication why. The CLI now prints actionable guidance (install `execute_sql` or use `rpc.return_types` in `suparepo.yaml`) when a high ratio of RPC functions cannot be resolved (fixes [#2](https://github.com/anies1212/supatools/issues/2))
+- OpenAPI parsing now resolves `$ref` response schemas and supports OpenAPI 3.0 `responses.200.content.<mediaType>.schema`, recovering return types in more PostgREST output shapes
+
+### Changed
+
+- Bump `supabase_schema_core` dependency to `^1.7.3`
+
 ## [1.16.0] - 2026-04-15
 
 ### Added

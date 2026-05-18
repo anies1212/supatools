@@ -197,11 +197,26 @@ class SchemaFetcher {
   final String supabaseKey;
   final String schema;
 
+  /// Diagnostic warnings emitted during the last fetch operation.
+  ///
+  /// Captures non-fatal issues such as `execute_sql` introspection
+  /// failures, so the CLI can surface actionable guidance instead of
+  /// silently producing degraded output (e.g. all RPC functions
+  /// resolved as `Future<void>`).
+  final List<String> _warnings = [];
+
+  /// Returns warnings collected during the last fetch operation.
+  List<String> get warnings => List.unmodifiable(_warnings);
+
   SchemaFetcher({
     required this.supabaseUrl,
     required this.supabaseKey,
     this.schema = 'public',
   });
+
+  void _addWarning(String message) {
+    _warnings.add(message);
+  }
 
   /// Fetches all tables and their columns from the database
   Future<List<TableInfo>> fetchTables() async {
@@ -359,6 +374,7 @@ class SchemaFetcher {
   /// When `execute_sql` RPC is available, corrects return types
   /// by querying `pg_proc` catalog directly.
   Future<List<RpcFunctionInfo>> fetchRpcFunctions() async {
+    _warnings.clear();
     final spec = await _fetchOpenApiSpec();
     final functions = parseRpcFunctions(spec);
 
@@ -373,7 +389,7 @@ class SchemaFetcher {
         // Continue even if TABLE column info fetch fails
       }
 
-      // json_build_object 自動検出 (tableColumns未設定の関数のみ)
+      // json_build_object auto-detect (only for funcs without tableColumns)
       try {
         final jsonColumnsMap = await _fetchRpcJsonColumns();
         merged = merged.map((func) {
@@ -432,9 +448,52 @@ class SchemaFetcher {
         // Ignore nested structure detection failure and continue
       }
 
+      _checkVoidReturnRatio(merged, introspectionAvailable: true);
       return merged;
-    } catch (_) {
+    } catch (e) {
+      _addWarning(
+        'RPC return-type introspection via `execute_sql` failed: $e\n'
+        '  → All RPC functions whose return type is not exposed via '
+        'OpenAPI will be generated as `Future<void>`.\n'
+        '  → To fix this, either install the `execute_sql` RPC '
+        '(see suparepo README) or specify return types manually '
+        'using `rpc.return_types` in suparepo.yaml.',
+      );
+      _checkVoidReturnRatio(functions, introspectionAvailable: false);
       return functions;
+    }
+  }
+
+  /// Emits a warning when a suspiciously high ratio of RPC functions
+  /// resolved to `void` — usually a sign that catalog introspection
+  /// silently failed (e.g. `execute_sql` is not installed, or the API
+  /// key lacks privileges to read `pg_proc`).
+  void _checkVoidReturnRatio(
+    List<RpcFunctionInfo> functions, {
+    required bool introspectionAvailable,
+  }) {
+    if (functions.length < 3) return;
+    final voidCount =
+        functions.where((f) => f.returnType == 'void').length;
+    final ratio = voidCount / functions.length;
+    if (ratio < 0.7) return;
+    if (introspectionAvailable) {
+      _addWarning(
+        '$voidCount/${functions.length} RPC function(s) resolved to '
+        '`void`. This can happen when PostgREST does not expose return '
+        'types in OpenAPI (e.g. SECURITY DEFINER functions, or when '
+        'using the new `sb_secret_xxx` API key format) AND `pg_proc` '
+        'introspection returned no rows for them.\n'
+        '  → Workaround: specify return types manually via '
+        '`rpc.return_types` in suparepo.yaml. '
+        'Example: `rpc.return_types: { is_admin: bool, register_user: '
+        '"setof jsonb" }`',
+      );
+    } else {
+      _addWarning(
+        '$voidCount/${functions.length} RPC function(s) resolved to '
+        '`void` (due to introspection failure above).',
+      );
     }
   }
 
@@ -1094,6 +1153,10 @@ class SchemaFetcher {
     Map<String, dynamic> spec,
   ) {
     final paths = spec['paths'] as Map<String, dynamic>? ?? {};
+    final definitions = spec['definitions'] as Map<String, dynamic>? ??
+        ((spec['components'] as Map<String, dynamic>?)?['schemas']
+            as Map<String, dynamic>?) ??
+        <String, dynamic>{};
     final functions = <RpcFunctionInfo>[];
 
     for (final entry in paths.entries) {
@@ -1112,7 +1175,10 @@ class SchemaFetcher {
       final params = _parseRpcParams(postSpec);
 
       // Parse return type
-      final (returnType, returnsSetOf) = _parseRpcReturnType(postSpec);
+      final (returnType, returnsSetOf) = _parseRpcReturnType(
+        postSpec,
+        definitions: definitions,
+      );
 
       functions.add(RpcFunctionInfo(
         name: funcName,
@@ -1158,25 +1224,79 @@ class SchemaFetcher {
     return params;
   }
 
-  /// Parses RPC function return type from the post spec
+  /// Parses RPC function return type from the post spec.
+  ///
+  /// Tries multiple OpenAPI shapes that PostgREST is known to emit:
+  /// 1. Swagger 2.0: `responses.200.schema`
+  /// 2. OpenAPI 3.0: `responses.200.content."application/json".schema`
+  /// 3. `$ref` schemas resolved against the spec's `definitions` /
+  ///    `components.schemas` section.
   (String, bool) _parseRpcReturnType(
-    Map<String, dynamic> postSpec,
-  ) {
+    Map<String, dynamic> postSpec, {
+    Map<String, dynamic> definitions = const {},
+  }) {
     final responses = postSpec['responses'] as Map<String, dynamic>? ?? {};
     final okResponse = responses['200'] as Map<String, dynamic>? ?? {};
-    final schema = okResponse['schema'] as Map<String, dynamic>? ?? {};
 
+    // Swagger 2.0
+    var schema = okResponse['schema'] as Map<String, dynamic>?;
+
+    // OpenAPI 3.0 fallback: responses.200.content.*.schema
+    if (schema == null) {
+      final content = okResponse['content'] as Map<String, dynamic>?;
+      if (content != null) {
+        for (final mediaType in content.values) {
+          if (mediaType is Map<String, dynamic>) {
+            final mediaSchema = mediaType['schema'];
+            if (mediaSchema is Map<String, dynamic>) {
+              schema = mediaSchema;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (schema == null || schema.isEmpty) return ('void', false);
+
+    // Resolve $ref → definitions[name]
+    schema = _resolveSchemaRef(schema, definitions);
     if (schema.isEmpty) return ('void', false);
 
     final type = schema['type'] as String?;
 
     if (type == 'array') {
       final items = schema['items'] as Map<String, dynamic>? ?? {};
-      final itemType = _openApiTypeToPgType(items);
+      final resolvedItems = _resolveSchemaRef(items, definitions);
+      final itemType = _openApiTypeToPgType(resolvedItems);
       return (itemType, true);
     }
 
     return (_openApiTypeToPgType(schema), false);
+  }
+
+  /// Resolves a `$ref` pointer (e.g. `#/definitions/foo` or
+  /// `#/components/schemas/foo`) against the provided definitions map.
+  ///
+  /// Returns the resolved schema, or the original schema if the ref
+  /// cannot be resolved. Returns an empty map when [schema] is empty.
+  Map<String, dynamic> _resolveSchemaRef(
+    Map<String, dynamic> schema,
+    Map<String, dynamic> definitions,
+  ) {
+    final ref = schema[r'$ref'];
+    if (ref is! String || ref.isEmpty) return schema;
+
+    // Extract the final segment of the JSON pointer.
+    // Handles #/definitions/foo, #/components/schemas/foo, etc.
+    final lastSlash = ref.lastIndexOf('/');
+    if (lastSlash == -1) return schema;
+    final name = ref.substring(lastSlash + 1);
+
+    final resolved = definitions[name];
+    if (resolved is Map<String, dynamic>) return resolved;
+
+    return schema;
   }
 
   /// Parses OpenAPI specification to extract table information

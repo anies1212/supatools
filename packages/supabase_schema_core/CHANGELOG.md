@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.3] - 2026-05-19
+
+### Added
+
+- `SchemaFetcher.warnings` getter that exposes non-fatal diagnostics collected during the last `fetchRpcFunctions()` call (e.g. `execute_sql` introspection failures, suspiciously high ratio of RPC functions resolved to `void`)
+- `parseRpcFunctions` now resolves `$ref` schemas against `definitions` / `components.schemas` and falls back to OpenAPI 3.0 `responses.200.content.<mediaType>.schema` when Swagger 2.0 `responses.200.schema` is absent
+
+### Fixed
+
+- When `execute_sql` RPC is not available, `fetchRpcFunctions()` no longer silently degrades to `Future<void>` for every RPC. A clear warning is recorded explaining the failure and pointing to `rpc.return_types` as a workaround (fixes [#2](https://github.com/anies1212/supatools/issues/2))
+
 ## [1.7.2] - 2026-04-08
 
 ### Fixed

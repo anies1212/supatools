@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.18.1] - 2026-05-20
+
+### Fixed
+
+- Edge Function client generator no longer emits an unused `import 'dart:convert';` when all functions have request-only models (no typed response). The import is now only added when at least one function declares a typed response, since `jsonDecode` / `utf8.decode` are only used inside the response-decoding path. This eliminates `unused_import` warnings in downstream projects that run `dart analyze --fatal-infos`.
+
 ## [1.18.0] - 2026-05-20
 
 ### Added

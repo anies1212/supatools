@@ -129,6 +129,8 @@ void main() {
         output,
         contains('data as Map<String, dynamic>'),
       );
+      // dart:convert is required because we call jsonDecode/utf8.decode
+      expect(output, contains("import 'dart:convert';"));
     });
 
     test('generates with type definitions (request only)', () {
@@ -162,6 +164,9 @@ void main() {
         output,
         contains('required NotifyRequest request'),
       );
+      // dart:convert must NOT be imported when no response is decoded
+      // (would trigger unused_import warning in consuming projects)
+      expect(output, isNot(contains("import 'dart:convert';")));
     });
 
     test('mixed typed and untyped functions', () {

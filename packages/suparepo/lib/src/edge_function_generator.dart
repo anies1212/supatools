@@ -28,10 +28,11 @@ class EdgeFunctionGenerator {
     // Imports
     buffer.writeln("import '$supabaseImport';");
 
-    // Check if any function has model definitions
-    final hasModels = modelDefs != null &&
-        functions.any((f) => modelDefs.containsKey(f.name));
-    if (hasModels) {
+    // dart:convert is only used when a typed response is decoded
+    // (jsonDecode + utf8.decode). Request-only models don't need it.
+    final hasResponseModels = modelDefs != null &&
+        functions.any((f) => modelDefs[f.name]?.response != null);
+    if (hasResponseModels) {
       buffer.writeln(
         "import 'dart:convert';",
       );

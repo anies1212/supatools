@@ -309,6 +309,11 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     print('⚠️  $warning');
   }
 
+  // SQL migration fallback: fill in return types from local *.sql files
+  // when introspection couldn't resolve them. Auto-detect common
+  // locations or honor `rpc.migrations_path` when set explicitly.
+  functions = await _applySqlMigrationFallback(functions, config);
+
   // Override with YAML return_types (YAML takes highest priority)
   final returnTypes = config.rpc.returnTypes;
   if (returnTypes != null) {
@@ -628,4 +633,83 @@ Future<int> _generateClientProviders(SuparepoConfig config) async {
 String _relativeImport(String from, String to) {
   final fromDir = p.dirname(from);
   return p.relative(to, from: fromDir);
+}
+
+/// Default migration directories to probe when [RpcConfig.migrationsPath]
+/// is not set explicitly. Relative to the current working directory.
+const _defaultMigrationsPaths = <String>[
+  '../supabase/migrations',
+  '../../supabase/migrations',
+  'supabase/migrations',
+];
+
+/// Fills in `void` return types from local SQL migration files when
+/// PostgREST/execute_sql introspection couldn't resolve them.
+///
+/// This is a pure read-only operation against project files — it
+/// never modifies the migrations and only touches functions that
+/// would otherwise be emitted as `Future<void>`.
+Future<List<RpcFunctionInfo>> _applySqlMigrationFallback(
+  List<RpcFunctionInfo> functions,
+  SuparepoConfig config,
+) async {
+  final voidCount = functions.where((f) => f.returnType == 'void').length;
+  if (voidCount == 0) return functions;
+
+  final migrationsDir = await _resolveMigrationsDir(config.rpc.migrationsPath);
+  if (migrationsDir == null) return functions;
+
+  final sqlFiles = <File>[];
+  await for (final entry in migrationsDir.list(recursive: true)) {
+    if (entry is File && entry.path.toLowerCase().endsWith('.sql')) {
+      sqlFiles.add(entry);
+    }
+  }
+  if (sqlFiles.isEmpty) return functions;
+
+  sqlFiles.sort((a, b) => a.path.compareTo(b.path));
+
+  final compositeTypes = <String, List<RpcTableColumn>>{};
+  for (final f in sqlFiles) {
+    final sql = await f.readAsString();
+    compositeTypes.addAll(SqlMigrationParser.parseCompositeTypes(sql));
+  }
+
+  final sqlFns = <String, SqlFunctionInfo>{};
+  for (final f in sqlFiles) {
+    final sql = await f.readAsString();
+    sqlFns.addAll(SqlMigrationParser.parseFunctions(
+      sql,
+      compositeTypes: compositeTypes,
+    ));
+  }
+
+  final result = SchemaFetcher.mergeSqlMigrationInfo(functions, sqlFns);
+  if (result.resolvedCount > 0) {
+    print(
+      '📄 SQL migrations fallback: resolved ${result.resolvedCount}/'
+      '$voidCount missing return type(s) from '
+      '${p.relative(migrationsDir.path)}',
+    );
+  }
+  return result.functions;
+}
+
+/// Resolves the migrations directory from explicit config or by
+/// probing common defaults. Returns null when no directory exists.
+Future<Directory?> _resolveMigrationsDir(String? explicitPath) async {
+  if (explicitPath != null && explicitPath.isNotEmpty) {
+    final dir = Directory(explicitPath);
+    if (await dir.exists()) return dir;
+    print(
+      '⚠️  rpc.migrations_path set to "$explicitPath" but the '
+      'directory does not exist. Skipping SQL migration fallback.',
+    );
+    return null;
+  }
+  for (final candidate in _defaultMigrationsPaths) {
+    final dir = Directory(candidate);
+    if (await dir.exists()) return dir;
+  }
+  return null;
 }

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.17.0] - 2026-05-19
+
+### Added
+
+- **SQL migrations fallback for RPC return-type introspection** — When `execute_sql` is not installed or PostgREST's OpenAPI omits response schemas, suparepo now parses local `*.sql` migration files to recover return types. This makes the RPC client generation work out of the box for projects that don't (or can't) install the `execute_sql` helper RPC.
+  - New config option `rpc.migrations_path` for explicit paths
+  - Auto-detects common locations (`../supabase/migrations`, `../../supabase/migrations`, `./supabase/migrations`) when the option is unset
+  - Composite types (`CREATE TYPE foo AS (...)`) referenced by `RETURNS SETOF foo` are fully resolved to typed column lists
+  - Resolution count is reported in the CLI output: `📄 SQL migrations fallback: resolved N/M missing return type(s)`
+
+### Changed
+
+- Bump `supabase_schema_core` dependency to `^1.8.0`
+
 ## [1.16.1] - 2026-05-19
 
 ### Fixed

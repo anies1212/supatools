@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.8.0] - 2026-05-19
+
+### Added
+
+- **`SqlMigrationParser`** — pure-Dart parser for local SQL migration files. Extracts RPC return-type info from `CREATE [OR REPLACE] FUNCTION ... RETURNS ...` statements and `CREATE TYPE ... AS (...)` composite types, with no database round-trip. Supports:
+  - Scalar returns (`RETURNS BOOLEAN`, `TEXT`, `UUID`, `INTEGER`, `BIGINT`, etc.)
+  - `RETURNS TABLE(col1 type1, ...)`
+  - `RETURNS SETOF <type>` (including composite types resolved to typed columns)
+  - Dollar-quoted bodies (correctly ignores `CREATE FUNCTION` text inside function bodies / `RAISE NOTICE` strings)
+  - Line (`--`) and block (`/* */`) comments
+  - Trigger functions are skipped (not RPC-callable)
+- `SchemaFetcher.mergeSqlMigrationInfo` — merges parser results into the function list, filling in only those still resolved to `void`
+
+### Changed
+
+- The execute_sql failure warning now lists `rpc.migrations_path` as the recommended workaround alongside the existing options
+
 ## [1.7.3] - 2026-05-19
 
 ### Added

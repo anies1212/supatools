@@ -5,6 +5,7 @@
 library;
 
 export 'src/schema_fetcher.dart';
+export 'src/sql_migration_parser.dart';
 export 'src/type_mapper.dart';
 export 'src/config_loader.dart';
 

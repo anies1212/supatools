@@ -64,6 +64,7 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       generateResultModels: value['generate_result_models'] == true,
       resultModelsOutput: value['result_models_output']?.toString(),
       resultModels: _parseResultModels(value['result_models']),
+      migrationsPath: value['migrations_path']?.toString(),
     );
   }
 
@@ -198,6 +199,13 @@ class RpcConfig {
   /// These are merged into `RpcFunctionInfo.tableColumns` during generation.
   final Map<String, List<RpcTableColumn>>? resultModels;
 
+  /// Path to a directory containing SQL migration files. When set
+  /// (or when a default such as `../supabase/migrations` exists),
+  /// suparepo parses `CREATE FUNCTION` statements locally to recover
+  /// RPC return types — useful when `execute_sql` is not installed
+  /// or PostgREST's OpenAPI omits response schemas.
+  final String? migrationsPath;
+
   const RpcConfig({
     this.enabled = false,
     this.output,
@@ -207,6 +215,7 @@ class RpcConfig {
     this.generateResultModels = false,
     this.resultModelsOutput,
     this.resultModels,
+    this.migrationsPath,
   });
 
   /// Checks if a function should be included

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'sql_migration_parser.dart';
 import 'type_mapper.dart';
 
 /// Represents a foreign key relationship
@@ -454,14 +455,50 @@ class SchemaFetcher {
       _addWarning(
         'RPC return-type introspection via `execute_sql` failed: $e\n'
         '  → All RPC functions whose return type is not exposed via '
-        'OpenAPI will be generated as `Future<void>`.\n'
-        '  → To fix this, either install the `execute_sql` RPC '
-        '(see suparepo README) or specify return types manually '
-        'using `rpc.return_types` in suparepo.yaml.',
+        'OpenAPI will be generated as `Future<void>` unless another '
+        'source resolves them.\n'
+        '  → Options:\n'
+        '      a. Set `rpc.migrations_path` in suparepo.yaml to point '
+        'at your SQL migrations (suparepo will parse CREATE FUNCTION '
+        'statements locally — no DB round-trip needed).\n'
+        '      b. Install the `execute_sql` RPC (see suparepo README).\n'
+        '      c. Specify return types manually via `rpc.return_types` '
+        'in suparepo.yaml.',
       );
       _checkVoidReturnRatio(functions, introspectionAvailable: false);
       return functions;
     }
+  }
+
+  /// Merges return-type info parsed from local SQL migration files
+  /// into [functions], filling in details for any function whose
+  /// `returnType` is still `void`.
+  ///
+  /// This is intended to be called by the CLI after
+  /// [fetchRpcFunctions] when `execute_sql` introspection has failed
+  /// (or never ran) and the user has configured a migrations path.
+  ///
+  /// The merge is conservative: it only updates functions whose
+  /// `returnType` is `void` and never overwrites existing
+  /// `tableColumns`.
+  static ({List<RpcFunctionInfo> functions, int resolvedCount})
+      mergeSqlMigrationInfo(
+    List<RpcFunctionInfo> functions,
+    Map<String, SqlFunctionInfo> sqlInfo,
+  ) {
+    var resolved = 0;
+    final merged = functions.map((func) {
+      if (func.returnType != 'void') return func;
+      final info = sqlInfo[func.name];
+      if (info == null) return func;
+      resolved++;
+      return func.copyWith(
+        returnType: info.returnType,
+        returnsSetOf: info.returnsSetOf,
+        tableColumns: func.tableColumns ?? info.tableColumns,
+      );
+    }).toList();
+    return (functions: merged, resolvedCount: resolved);
   }
 
   /// Emits a warning when a suspiciously high ratio of RPC functions

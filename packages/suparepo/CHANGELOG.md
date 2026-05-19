@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.18.0] - 2026-05-20
+
+### Added
+
+- **In-memory fake repository generation** (`generate_fakes: true`) — emits `{table}_repository.fake.dart` alongside each real repository. The generated `Fake{Table}Repository` class `implements` the real repository so it can be substituted via Riverpod overrides in tests:
+  - CRUD methods (`getAll`/`getById`/`create`/`update`/`delete`/`count`/`paginate`) operate on an in-memory `Map<dynamic, Model>` keyed by primary key
+  - `seed(records)` helper to populate the store
+  - Relation methods (`getAllWith*`) fall back to `getAll()` since relations can't be auto-embedded in memory
+  - Custom methods from `.custom.dart` are stubbed with `UnimplementedError` so callers can override them in a subclass for test-specific behavior
+
 ## [1.17.0] - 2026-05-19
 
 ### Added

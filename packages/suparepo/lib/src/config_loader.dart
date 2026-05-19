@@ -37,6 +37,7 @@ class SuparepoConfigLoader extends BaseConfigLoader {
         resolveValue(yaml['fetch']?.toString()),
       ),
       generateBarrel: yaml['generate_barrel'] == true,
+      generateFakes: yaml['generate_fakes'] == true,
       modelImportPath: yaml['model_import_path']?.toString(),
       modelImportPrefix: yaml['model_import_prefix']?.toString(),
       supabaseImport:
@@ -275,6 +276,13 @@ const pureDartSupabaseImport = 'package:supabase/supabase.dart';
 class SuparepoConfig extends BaseSupabaseConfig {
   final bool generateBarrel;
 
+  /// Whether to generate in-memory fake repositories (`*.fake.dart`)
+  /// alongside the real repositories. Fakes implement the same interface
+  /// using an in-memory `Map<dynamic, Model>` for CRUD operations, while
+  /// relation and custom methods throw [UnimplementedError] by default
+  /// so callers can override them in tests.
+  final bool generateFakes;
+
   /// Import path for model classes (barrel file).
   /// If set, all repositories import this single path.
   final String? modelImportPath;
@@ -327,6 +335,7 @@ class SuparepoConfig extends BaseSupabaseConfig {
     super.exclude,
     super.fetch = FetchMode.always,
     this.generateBarrel = false,
+    this.generateFakes = false,
     this.modelImportPath,
     this.modelImportPrefix,
     this.supabaseImport = defaultSupabaseImport,
@@ -350,6 +359,7 @@ SuparepoConfig:
   include: ${include ?? 'none'}
   exclude: ${exclude ?? 'none'}
   generateBarrel: $generateBarrel
+  generateFakes: $generateFakes
   modelImportPath: ${modelImportPath ?? 'none'}
   modelImportPrefix: ${modelImportPrefix ?? 'none'}
   generateProviders: $generateProviders

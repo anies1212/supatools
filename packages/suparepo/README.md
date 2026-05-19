@@ -672,6 +672,59 @@ class UsersRepository {
 }
 ```
 
+### Fake Repository Generation
+
+When `generate_fakes: true` is set, suparepo emits a sibling `{table}_repository.fake.dart` file alongside each real repository:
+
+```yaml
+output: lib/repositories
+generate_fakes: true
+```
+
+The generated `Fake{Table}Repository` class `implements` the real repository and backs CRUD with an in-memory `Map<dynamic, Model>` keyed by primary key:
+
+```dart
+class FakeUsersRepository implements UsersRepository {
+  final Map<dynamic, User> store;
+
+  FakeUsersRepository({Map<dynamic, User>? initial})
+      : store = {...?initial};
+
+  void seed(Iterable<User> records) { /* ... */ }
+
+  @override
+  Future<List<User>> getAll() async => store.values.toList();
+
+  @override
+  Future<User?> getById(String id) async => store[id];
+
+  // ... create / update / delete / count / paginate ...
+
+  // Relation methods fall back to getAll() (relations are not embedded).
+  @override
+  Future<List<User>> getAllWithCompany() => getAll();
+
+  // Custom methods (from .custom.dart) are stubbed — override in tests.
+  @override
+  Future<User?> getActive()
+      => throw UnimplementedError(
+        'FakeUsersRepository.getActive is not faked. '
+        'Override in a subclass to provide test behavior.',
+      );
+}
+```
+
+Use it in tests by injecting the fake via Riverpod overrides:
+
+```dart
+final fake = FakeUsersRepository()..seed([alice, bob]);
+final container = ProviderContainer(overrides: [
+  usersRepositoryProvider.overrideWith((ref) => fake),
+]);
+```
+
+Custom methods and relation methods are intentionally stubbed because their semantics (`.custom.dart` SQL, Supabase relation embeds) can't be replicated in memory — subclass the fake in your test file to provide specific behavior when needed.
+
 ### Riverpod Provider Generation
 
 When `generate_providers: true` is set, each repository and RPC client gets a `@Riverpod(keepAlive: true)` provider:
@@ -733,6 +786,7 @@ output: lib/repositories
 schema: public
 fetch: always                # always | if_no_cache | never
 generate_barrel: false       # Generate barrel file for repositories (default: false)
+generate_fakes: false        # Generate in-memory *.fake.dart files for tests (default: false)
 generate_providers: true     # Generate Riverpod providers (default: false)
 client_provider_output: ../gateway/lib/supabase/supabase_client_provider.dart  # Custom output path
 client_provider_import: package:gateway/supabase/supabase_client_provider.dart # Custom import path

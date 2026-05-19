@@ -220,6 +220,138 @@ class CustomMethodMigrator {
     return buffer.toString();
   }
 
+  /// Parse top-level method/getter declarations from an extension body.
+  ///
+  /// Used by the fake repository generator to produce stub implementations
+  /// for custom methods that can't be auto-faked. The returned [MethodInfo]
+  /// `source` contains the full member text (including doc comments).
+  List<MethodInfo> parseExtensionMembers(String extensionBody) {
+    final members = _extractMembers(extensionBody);
+    final result = <MethodInfo>[];
+    for (final m in members) {
+      final name = _extractMemberName(m);
+      if (name == null) continue;
+      result.add(MethodInfo(name: name, source: m));
+    }
+    return result;
+  }
+
+  /// Extract the signature portion of a member source — everything up to
+  /// the body start (`{` or `=>`), with `async`/`sync*` modifiers stripped.
+  ///
+  /// Returns `null` when the signature cannot be recovered.
+  String? extractMemberSignature(String memberSource) {
+    final parenStart = _findFirstParen(memberSource);
+    if (parenStart == -1) {
+      return _signatureWithoutBody(memberSource);
+    }
+    final parenEnd = _findMatchingParen(memberSource, parenStart);
+    if (parenEnd == -1) return null;
+
+    var i = parenEnd + 1;
+    while (i < memberSource.length) {
+      final ch = memberSource[i];
+      if (ch == ' ' || ch == '\t' || ch == '\n') {
+        i++;
+        continue;
+      }
+      final rest = memberSource.substring(i);
+      if (rest.startsWith('async*') ||
+          rest.startsWith('sync*')) {
+        i += 6;
+        continue;
+      }
+      if (rest.startsWith('async')) {
+        i += 5;
+        continue;
+      }
+      break;
+    }
+    if (i >= memberSource.length) return null;
+
+    final beforeBody = memberSource.substring(0, i);
+    return beforeBody
+        .replaceAll(RegExp(r'\basync\*?'), '')
+        .replaceAll(RegExp(r'\bsync\*'), '')
+        .trimRight();
+  }
+
+  /// Locate the first `(` that is not inside a generic `<…>` bracket.
+  int _findFirstParen(String source) {
+    var generic = 0;
+    var inString = false;
+    String? stringChar;
+    for (var i = 0; i < source.length; i++) {
+      final ch = source[i];
+      if (inString) {
+        if (ch == '\\') {
+          i++;
+          continue;
+        }
+        if (ch == stringChar) {
+          inString = false;
+          stringChar = null;
+        }
+        continue;
+      }
+      if (ch == "'" || ch == '"') {
+        inString = true;
+        stringChar = ch;
+        continue;
+      }
+      if (ch == '<') generic++;
+      if (ch == '>' && generic > 0) generic--;
+      if (ch == '(' && generic == 0) return i;
+    }
+    return -1;
+  }
+
+  /// Given an opening `(` at [openIndex], return the index of the matching `)`.
+  int _findMatchingParen(String source, int openIndex) {
+    var depth = 1;
+    var inString = false;
+    String? stringChar;
+    var i = openIndex + 1;
+    while (i < source.length) {
+      final ch = source[i];
+      if (inString) {
+        if (ch == '\\') {
+          i += 2;
+          continue;
+        }
+        if (ch == stringChar) {
+          inString = false;
+          stringChar = null;
+        }
+        i++;
+        continue;
+      }
+      if (ch == "'" || ch == '"') {
+        inString = true;
+        stringChar = ch;
+        i++;
+        continue;
+      }
+      if (ch == '(') depth++;
+      if (ch == ')') {
+        depth--;
+        if (depth == 0) return i;
+      }
+      i++;
+    }
+    return -1;
+  }
+
+  /// Fallback signature extractor for members without parameters (getters).
+  String? _signatureWithoutBody(String source) {
+    final braceIndex = source.indexOf('{');
+    final arrowIndex = source.indexOf('=>');
+    final ends = [braceIndex, arrowIndex].where((v) => v >= 0).toList();
+    if (ends.isEmpty) return null;
+    ends.sort();
+    return source.substring(0, ends.first).trimRight();
+  }
+
   /// Extract methods and imports from .custom.dart file (extension format).
   /// Used for embedding into the generated repository class.
   CustomFileContent? extractFromCustomFile(

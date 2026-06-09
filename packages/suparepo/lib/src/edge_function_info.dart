@@ -51,4 +51,23 @@ class EdgeFunctionModelDef {
     this.response,
     this.errors,
   });
+
+  /// Merges a YAML-defined model with an auto-detected one.
+  ///
+  /// YAML wins per field group (request/response/errors); auto-detection fills
+  /// any group the YAML omits. This keeps auto-detected error/response classes
+  /// even when the YAML overrides only `request`. Returns null when both are
+  /// null.
+  static EdgeFunctionModelDef? merge(
+    EdgeFunctionModelDef? yaml,
+    EdgeFunctionModelDef? auto,
+  ) {
+    if (yaml == null) return auto;
+    if (auto == null) return yaml;
+    return EdgeFunctionModelDef(
+      request: yaml.request ?? auto.request,
+      response: yaml.response ?? auto.response,
+      errors: yaml.errors ?? auto.errors,
+    );
+  }
 }

@@ -456,27 +456,33 @@ Future<int> _generateEdgeFunctionClient(
 
   if (config.edgeFunctions.autoDetectTypes) {
     final loader = TsTypeExtractorLoader();
-    final autoDetected = <String, EdgeFunctionModelDef>{};
+    final merged = <String, EdgeFunctionModelDef>{};
 
     for (final func in filtered) {
-      // Skip functions already defined in YAML
-      if (modelDefs.containsKey(func.name)) continue;
-
       final funcDir = p.join(
         config.edgeFunctions.functionsPath,
         func.name,
       );
-      final modelDef = await loader.extractFromDirectory(
+      final autoDef = await loader.extractFromDirectory(
         funcDir,
         inferRequestFromUsage: config.edgeFunctions.inferRequestFromUsage,
       );
-      if (modelDef != null) {
-        autoDetected[func.name] = modelDef;
+      final yamlDef = modelDefs[func.name];
+
+      // YAML definitions take precedence per field group (request/response/
+      // errors); auto-detection fills in any group the YAML omits. This keeps
+      // auto-detected error classes even when YAML overrides only `request`.
+      final modelDef = EdgeFunctionModelDef.merge(yamlDef, autoDef);
+      if (modelDef == null) continue;
+
+      merged[func.name] = modelDef;
+      if (autoDef != null) {
         print('🔍 Auto-detected types: ${func.name}');
       }
     }
 
-    modelDefs = {...modelDefs, ...autoDetected};
+    // Preserve YAML-only entries for functions that produced no auto-detection.
+    modelDefs = {...modelDefs, ...merged};
   }
 
   final generator = EdgeFunctionGenerator();

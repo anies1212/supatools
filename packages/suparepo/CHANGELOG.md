@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.20.1] - 2026-06-10
+
+### Fixed
+
+- **YAML `models:` now merge with auto-detection instead of replacing it.** Previously, defining a `models:` entry for an Edge Function suppressed auto-detection for that function entirely — so overriding only `request` would drop its auto-detected error/response classes. Now YAML wins per field group (`request`/`response`/`errors`) and auto-detection fills in any group the YAML omits. This lets you override just the request types (e.g. to fix numeric/boolean fields the usage-based inference can't recover) while keeping the auto-generated `XError` sealed classes.
+
 ## [1.20.0] - 2026-06-10
 
 ### Added

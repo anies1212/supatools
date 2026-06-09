@@ -137,6 +137,116 @@ if (!receipt_id) {
       });
     });
 
+    group('usage-based request inference (inferRequestFromUsage)', () {
+      test('is off by default: no body-access inference', () {
+        const source = '''
+const body = await req.json();
+const todoId = body.todo_id;
+if (typeof todoId !== "string") return badRequest("required");
+''';
+        final result = extractor.extract(indexSource: source);
+        expect(result?.request, isNull);
+      });
+
+      test('infers fields from req.json() as { ... } cast', () {
+        const source = '''
+const body = await req.json() as { authorization_code?: unknown };
+const authorizationCode = body.authorization_code;
+''';
+        final result = extractor.extract(
+          indexSource: source,
+          inferRequestFromUsage: true,
+        );
+        expect(result!.request, hasLength(1));
+        expect(result.request!.first.name, 'authorization_code');
+      });
+
+      test('infers fields from body.<field> access', () {
+        const source = '''
+let body;
+try {
+  body = await req.json();
+} catch {
+  return badRequest("invalid");
+}
+const bondType = body.bond_type;
+if (!VALID.includes(bondType)) return badRequest("invalid");
+const birthDate = typeof body.birth_date === "string"
+  ? body.birth_date
+  : null;
+const nickname = typeof body.nickname === "string" ? body.nickname : null;
+''';
+        final result = extractor.extract(
+          indexSource: source,
+          inferRequestFromUsage: true,
+        );
+        final fields = {for (final f in result!.request!) f.name: f};
+        expect(
+            fields.keys, containsAll(['bond_type', 'birth_date', 'nickname']));
+        // bare access + validation -> required
+        expect(fields['bond_type']!.isRequired, isTrue);
+        // typeof ternary with default -> optional
+        expect(fields['birth_date']!.isRequired, isFalse);
+        expect(fields['nickname']!.isRequired, isFalse);
+      });
+
+      test('infers boolean from body.x === true and marks it optional', () {
+        const source = '''
+const body = await req.json();
+const bondId = body.bond_id;
+if (typeof bondId !== "string") return badRequest("required");
+const isPinned = body.is_pinned === true;
+''';
+        final result = extractor.extract(
+          indexSource: source,
+          inferRequestFromUsage: true,
+        );
+        final fields = {for (final f in result!.request!) f.name: f};
+        expect(fields['bond_id']!.isRequired, isTrue);
+        expect(fields['is_pinned']!.dataType, 'bool');
+        expect(fields['is_pinned']!.isRequired, isFalse);
+      });
+
+      test('!== undefined guard makes a field optional', () {
+        const source = '''
+const body = await req.json();
+if (body.birth_date !== undefined) update.birth_date = body.birth_date;
+''';
+        final result = extractor.extract(
+          indexSource: source,
+          inferRequestFromUsage: true,
+        );
+        expect(result!.request!.first.name, 'birth_date');
+        expect(result.request!.first.isRequired, isFalse);
+      });
+
+      test('typeof number guard infers integer', () {
+        const source = '''
+const body = await req.json();
+const count = typeof body.count === "number" ? body.count : 0;
+''';
+        final result = extractor.extract(
+          indexSource: source,
+          inferRequestFromUsage: true,
+        );
+        expect(result!.request!.first.dataType, 'integer');
+      });
+
+      test('explicit body as { } takes precedence over inference', () {
+        const source = '''
+const { id } = body as { id: string };
+const x = body.other_field;
+''';
+        final result = extractor.extract(
+          indexSource: source,
+          inferRequestFromUsage: true,
+        );
+        // Explicit annotation wins; the body-access path is not used.
+        expect(result!.request, hasLength(1));
+        expect(result.request!.first.name, 'id');
+      });
+    });
+
     group('response type extraction', () {
       test('extracts fields from success response JSON.stringify', () {
         const source = '''

@@ -474,6 +474,7 @@ edge_functions:
   output: lib/repositories/edge_function_client.dart  # optional
   auto_detect_types: true  # Auto-detect types from TypeScript (default: true)
   flatten_request_params: true  # Expand request fields into named params (default: false)
+  infer_request_from_usage: true  # Infer request types from handler body usage (default: false)
   include:
     - send-email
   exclude:
@@ -601,6 +602,35 @@ Future<SendEmailResponse> sendEmail({
 > via YAML `models`). The `SendEmailRequest` class is still generated for
 > backward compatibility. Required fields are emitted before optional ones to
 > satisfy Dart's parameter ordering.
+
+### Usage-based Request Inference (`infer_request_from_usage`)
+
+By default, request models are only auto-detected from an explicit
+`body as { ... }` type annotation. Many Deno Edge Functions instead destructure
+the body field-by-field with no declared type:
+
+```ts
+const body = await req.json();
+const bondType = body.bond_type;                 // required (validated below)
+if (!VALID.includes(bondType)) return badRequest("...");
+const nickname = typeof body.nickname === "string" ? body.nickname : null; // optional
+const isPinned = body.is_pinned === true;        // boolean, optional
+```
+
+Set `infer_request_from_usage: true` to recover request models from this style.
+Inference rules:
+
+- Fields: every `body.<field>` access (and `req.json() as { ... }` casts)
+- Types: `typeof body.<field> === "string" | "number" | "boolean"` guards, plus
+  `body.<field> === true | false` → `bool`
+- Optionality: ternary/nullish defaults, `if (body.<field> !== undefined)`
+  guards, and boolean-flag comparisons mark a field optional; otherwise required
+
+> **Note:** Inference is heuristic and opt-in. Numeric fields **without** a
+> `typeof === "number"` guard cannot be recovered and fall back to `text` —
+> define an explicit `models:` entry to override them. YAML `models:` always
+> take precedence over inference. Combine with `flatten_request_params: true`
+> to expose the inferred fields as named method parameters.
 
 ### Error Type Generation (Freezed sealed class)
 

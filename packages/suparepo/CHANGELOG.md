@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.20.0] - 2026-06-10
+
+### Added
+
+- **Usage-based Edge Function request inference** (`edge_functions.infer_request_from_usage: true`) — recovers request models for handlers that don't declare an explicit `body as { ... }` type. Opt-in (default `false`) because inference is heuristic. When enabled, request fields are inferred from:
+  - `req.json() as { ... }` cast annotations
+  - `body.<field>` access patterns, with types from `typeof body.<field> === "string" | "number" | "boolean"` guards (and `body.<field> === true | false` for booleans)
+  - optionality from ternary/nullish defaults (`typeof body.x === "string" ? ... : null`, `body.x ?? ...`), `if (body.x !== undefined)` guards, and boolean flag comparisons
+  - This makes auto-detection (and `flatten_request_params`) work for Deno Edge Functions that destructure the body field-by-field. Numeric fields without a `typeof === "number"` guard fall back to `text` — define `models:` to override these. YAML `models:` always take precedence over inference.
+
 ## [1.19.0] - 2026-06-10
 
 ### Added

@@ -7,15 +7,25 @@ class TsTypeExtractor {
   const TsTypeExtractor();
 
   /// Extracts model definitions from TypeScript source
+  ///
+  /// When [inferRequestFromUsage] is true and no explicit `body as { ... }`
+  /// annotation is found, request fields are inferred from handler usage:
+  /// `req.json() as { ... }` casts and `body.<field>` access patterns with
+  /// `typeof body.<field> === "..."` type guards. This is heuristic and
+  /// opt-in, since the inferred shape may not be perfectly precise.
   EdgeFunctionModelDef? extract({
     required String indexSource,
     String? handlerSource,
+    bool inferRequestFromUsage = false,
   }) {
     final source = _removeComments(
       handlerSource != null ? '$indexSource\n$handlerSource' : indexSource,
     );
 
-    final request = _extractRequestFields(source);
+    var request = _extractRequestFields(source);
+    if (request == null && inferRequestFromUsage) {
+      request = _inferRequestFieldsFromUsage(source);
+    }
     final response = _extractResponseFields(source);
     final errors = _extractErrorCodes(source);
 
@@ -30,12 +40,15 @@ class TsTypeExtractor {
     );
   }
 
-  /// Extracts request fields from `body as { ... }` pattern
+  /// Extracts request fields from an explicit `body as { ... }` annotation.
   List<EdgeFunctionFieldDef>? _extractRequestFields(String source) {
     final bodyMatch = _bodyAsPattern.firstMatch(source);
     if (bodyMatch == null) return null;
+    return _parseTypeBlock(bodyMatch.group(1)!, source);
+  }
 
-    final block = bodyMatch.group(1)!;
+  /// Parses a TypeScript type block (`{ name?: type; ... }`) into field defs.
+  List<EdgeFunctionFieldDef>? _parseTypeBlock(String block, String source) {
     final fields = <EdgeFunctionFieldDef>[];
     final requiredFields = _extractRequiredFields(source);
 
@@ -54,6 +67,87 @@ class TsTypeExtractor {
     }
 
     return fields.isEmpty ? null : fields;
+  }
+
+  /// Heuristically infers request fields from handler usage (opt-in).
+  ///
+  /// Strategy 1: an explicit `req.json() as { ... }` cast.
+  /// Strategy 2: `body.<field>` accesses on the `await req.json()` result,
+  /// with types inferred from `typeof body.<field> === "..."` guards and
+  /// optionality inferred from ternary/nullish defaults.
+  List<EdgeFunctionFieldDef>? _inferRequestFieldsFromUsage(String source) {
+    final castMatch = _jsonCastPattern.firstMatch(source);
+    if (castMatch != null) {
+      final fields = _parseTypeBlock(castMatch.group(1)!, source);
+      if (fields != null) return fields;
+    }
+    return _inferRequestFieldsFromBodyAccess(source);
+  }
+
+  /// Infers request fields from `body.<field>` access patterns.
+  List<EdgeFunctionFieldDef>? _inferRequestFieldsFromBodyAccess(String source) {
+    final assignMatch = _jsonAssignPattern.firstMatch(source);
+    if (assignMatch == null) return null;
+    final varName = assignMatch.group(1)!;
+
+    final accessPattern = RegExp('$varName\\.([a-zA-Z_]\\w*)');
+    final ordered = <String>[];
+    final seen = <String>{};
+    for (final match in accessPattern.allMatches(source)) {
+      final field = match.group(1)!;
+      if (seen.add(field)) ordered.add(field);
+    }
+    if (ordered.isEmpty) return null;
+
+    return [
+      for (final name in ordered)
+        EdgeFunctionFieldDef(
+          name: name,
+          dataType: _inferBodyFieldType(source, varName, name),
+          isRequired: !_isBodyFieldOptional(source, varName, name),
+        ),
+    ];
+  }
+
+  /// Infers a body field's type from handler usage.
+  ///
+  /// `typeof body.<field> === "string|number|boolean"` guards are precise.
+  /// A `body.<field> === true|false` comparison implies a boolean. Numeric
+  /// fields without a `typeof === "number"` guard cannot be recovered and
+  /// fall back to `text` — define `models:` in config to override these.
+  String _inferBodyFieldType(String source, String varName, String field) {
+    final typeofMatch = RegExp(
+      'typeof\\s+$varName\\.$field\\s*===?\\s*"(string|number|boolean)"',
+    ).firstMatch(source);
+    if (typeofMatch != null) {
+      return switch (typeofMatch.group(1)) {
+        'number' => 'integer',
+        'boolean' => 'bool',
+        _ => 'text',
+      };
+    }
+    if (RegExp('$varName\\.$field\\s*===?\\s*(?:true|false)\\b')
+        .hasMatch(source)) {
+      return 'bool';
+    }
+    return 'text';
+  }
+
+  /// A body field is optional when its absence is explicitly handled, e.g.
+  /// `typeof body.x === "string" ? body.x : null`, `body.x ?? ...`,
+  /// `if (body.x !== undefined)`, or a `body.x === true` boolean flag.
+  bool _isBodyFieldOptional(String source, String varName, String field) {
+    final ternary = RegExp(
+      'typeof\\s+$varName\\.$field\\s*===?\\s*"[a-z]+"\\s*\\?',
+    ).hasMatch(source);
+    final nullish = RegExp('$varName\\.$field\\s*\\?\\?').hasMatch(source);
+    final undefinedGuard = RegExp(
+      '$varName\\.$field\\s*[!=]==\\s*undefined',
+    ).hasMatch(source);
+    final boolFlag = RegExp(
+      '$varName\\.$field\\s*===?\\s*(?:true|false)\\b',
+    ).hasMatch(source);
+    return ternary || nullish || undefinedGuard || boolFlag;
   }
 
   /// Extracts response fields from success `JSON.stringify({ ... })`
@@ -249,6 +343,17 @@ class TsTypeExtractor {
     dotAll: true,
   );
 
+  /// `req.json() as { ... }` cast block (used by usage-based inference)
+  static final _jsonCastPattern = RegExp(
+    r'req\.json\(\)\s+as\s*\{([^}]+)\}',
+    dotAll: true,
+  );
+
+  /// `<var> = await req.json()` — captures the body variable name
+  static final _jsonAssignPattern = RegExp(
+    r'(\w+)\s*=\s*await\s+req\.json\(\)',
+  );
+
   /// TypeScript field definition: name?: type;
   static final _fieldPattern = RegExp(
     r'(\w+)(\?)?:\s*(\w+)',
@@ -316,8 +421,9 @@ class TsTypeExtractorLoader {
 
   /// Extracts model definitions from the given function directory
   Future<EdgeFunctionModelDef?> extractFromDirectory(
-    String functionDirPath,
-  ) async {
+    String functionDirPath, {
+    bool inferRequestFromUsage = false,
+  }) async {
     final indexFile = File(p.join(functionDirPath, 'index.ts'));
     if (!await indexFile.exists()) return null;
 
@@ -333,6 +439,7 @@ class TsTypeExtractorLoader {
     return _extractor.extract(
       indexSource: indexSource,
       handlerSource: handlerSource,
+      inferRequestFromUsage: inferRequestFromUsage,
     );
   }
 }

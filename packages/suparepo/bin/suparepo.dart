@@ -466,7 +466,10 @@ Future<int> _generateEdgeFunctionClient(
         config.edgeFunctions.functionsPath,
         func.name,
       );
-      final modelDef = await loader.extractFromDirectory(funcDir);
+      final modelDef = await loader.extractFromDirectory(
+        funcDir,
+        inferRequestFromUsage: config.edgeFunctions.inferRequestFromUsage,
+      );
       if (modelDef != null) {
         autoDetected[func.name] = modelDef;
         print('🔍 Auto-detected types: ${func.name}');

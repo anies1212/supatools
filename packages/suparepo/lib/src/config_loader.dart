@@ -131,6 +131,7 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       exclude: parseStringList(value['exclude']),
       models: _parseEdgeFunctionModels(value['models']),
       autoDetectTypes: value['auto_detect_types'] != false,
+      flattenRequestParams: value['flatten_request_params'] == true,
     );
   }
 
@@ -244,6 +245,16 @@ class EdgeFunctionConfig {
   /// Enabled by default. Functions with YAML model definitions take precedence.
   final bool autoDetectTypes;
 
+  /// Whether to flatten request model fields into named method parameters.
+  ///
+  /// When false (default), a typed method takes a single `request:` wrapper
+  /// (e.g. `sendEmail(request: SendEmailRequest(to: ...))`). When true, the
+  /// request fields become named parameters directly
+  /// (e.g. `sendEmail(to: ..., subject: ...)`) and the JSON body is built
+  /// inside the generated method, so callers never hardcode JSON keys.
+  /// The `XRequest` class is still generated for backward compatibility.
+  final bool flattenRequestParams;
+
   const EdgeFunctionConfig({
     this.enabled = false,
     this.output,
@@ -252,6 +263,7 @@ class EdgeFunctionConfig {
     this.exclude,
     this.models,
     this.autoDetectTypes = true,
+    this.flattenRequestParams = false,
   });
 
   /// Checks if a function should be included

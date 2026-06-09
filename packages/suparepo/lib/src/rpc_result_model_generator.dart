@@ -47,8 +47,7 @@ class RpcResultModelGenerator {
     buffer.writeln(
       "import 'package:freezed_annotation/freezed_annotation.dart';",
     );
-    final hasErrorType =
-        func.errorCodes != null && func.errorCodes!.isNotEmpty;
+    final hasErrorType = func.errorCodes != null && func.errorCodes!.isNotEmpty;
     if (hasErrorType) {
       buffer.writeln("import '${errorFileName(func.name)}';");
     }
@@ -66,22 +65,20 @@ class RpcResultModelGenerator {
     );
     buffer.writeln('  const factory $className({');
 
-    final errClassName =
-        hasErrorType ? errorClassName(func.name) : null;
+    final errClassName = hasErrorType ? errorClassName(func.name) : null;
 
     for (final col in columns) {
       final fieldName = ReCase(col.name).camelCase;
-      final isErrorCol = hasErrorType &&
-          (col.name == 'error' || col.name == 'error_code');
-      final hasNested = col.nestedColumns != null &&
-          col.nestedColumns!.isNotEmpty;
+      final isErrorCol =
+          hasErrorType && (col.name == 'error' || col.name == 'error_code');
+      final hasNested =
+          col.nestedColumns != null && col.nestedColumns!.isNotEmpty;
       final String dartType;
       if (isErrorCol) {
         dartType = errClassName!;
       } else if (hasNested) {
         final nestedName = _nestedClassName(className, col.name);
-        dartType =
-            col.isArray ? 'List<$nestedName>' : nestedName;
+        dartType = col.isArray ? 'List<$nestedName>' : nestedName;
       } else if (TypeMapper.isJsonType(col.dataType)) {
         dartType = 'dynamic';
       } else {
@@ -102,11 +99,11 @@ class RpcResultModelGenerator {
 
     for (final col in columns) {
       final fieldName = ReCase(col.name).camelCase;
-      final isErrorCol = hasErrorType &&
-          (col.name == 'error' || col.name == 'error_code');
+      final isErrorCol =
+          hasErrorType && (col.name == 'error' || col.name == 'error_code');
       final isJson = TypeMapper.isJsonType(col.dataType);
-      final hasNested = col.nestedColumns != null &&
-          col.nestedColumns!.isNotEmpty;
+      final hasNested =
+          col.nestedColumns != null && col.nestedColumns!.isNotEmpty;
       if (isErrorCol) {
         buffer.writeln(
           "        $fieldName: "
@@ -155,8 +152,7 @@ class RpcResultModelGenerator {
 
     // Generate nested model classes in the same file
     for (final col in columns) {
-      if (col.nestedColumns == null ||
-          col.nestedColumns!.isEmpty) {
+      if (col.nestedColumns == null || col.nestedColumns!.isEmpty) {
         continue;
       }
       buffer.writeln();
@@ -302,8 +298,7 @@ class RpcResultModelGenerator {
     // Named constructors for each error code
     for (final code in codes) {
       final factoryName = ReCase(code).camelCase;
-      final subclassName =
-          '$className${ReCase(code).pascalCase}';
+      final subclassName = '$className${ReCase(code).pascalCase}';
       buffer.writeln(
         '  const factory $className.$factoryName()'
         ' = $subclassName;',

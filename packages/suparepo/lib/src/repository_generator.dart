@@ -366,10 +366,10 @@ class RepositoryGenerator {
     );
     final pkName = primaryKey.name;
     final pkDartType = TypeMapper.mapType(primaryKey.dataType);
-    final recordType = _hasModelImport ? modelClassName : 'Map<String, dynamic>';
-    final pkFromRecord = _hasModelImport
-        ? "record.toJson()['$pkName']"
-        : "record['$pkName']";
+    final recordType =
+        _hasModelImport ? modelClassName : 'Map<String, dynamic>';
+    final pkFromRecord =
+        _hasModelImport ? "record.toJson()['$pkName']" : "record['$pkName']";
 
     final buffer = StringBuffer();
 
@@ -407,8 +407,10 @@ class RepositoryGenerator {
     buffer.writeln('/// In-memory fake of [$repoClassName] for tests.');
     buffer.writeln('///');
     buffer.writeln('/// CRUD methods operate on [store] keyed by `$pkName`.');
-    buffer.writeln('/// Relation methods fall back to [getAll]. Custom methods');
-    buffer.writeln('/// throw [UnimplementedError] — override in a subclass to');
+    buffer
+        .writeln('/// Relation methods fall back to [getAll]. Custom methods');
+    buffer
+        .writeln('/// throw [UnimplementedError] — override in a subclass to');
     buffer.writeln('/// provide test-specific behavior.');
     buffer.writeln('class $fakeClassName implements $repoClassName {');
     buffer.writeln('  /// In-memory record store keyed by primary key value.');
@@ -500,8 +502,7 @@ class RepositoryGenerator {
     for (final column in table.columns) {
       if (column.foreignKey == null) continue;
       final relationName = _getRelationName(column.name);
-      final methodName =
-          'getAllWith${ReCase(relationName).pascalCase}';
+      final methodName = 'getAllWith${ReCase(relationName).pascalCase}';
       buffer.writeln();
       buffer.writeln('  @override');
       buffer.writeln(

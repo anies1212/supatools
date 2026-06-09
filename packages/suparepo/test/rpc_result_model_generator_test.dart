@@ -558,8 +558,7 @@ void main() {
         ),
       ];
 
-      final result =
-          generator.generateAllErrorClasses(functions);
+      final result = generator.generateAllErrorClasses(functions);
 
       expect(result, hasLength(1));
       expect(

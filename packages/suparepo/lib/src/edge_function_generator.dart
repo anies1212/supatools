@@ -12,6 +12,7 @@ class EdgeFunctionGenerator {
     List<EdgeFunctionInfo> functions, {
     Map<String, EdgeFunctionModelDef>? modelDefs,
     String supabaseImport = defaultSupabaseImport,
+    bool flattenRequestParams = false,
   }) {
     final buffer = StringBuffer();
 
@@ -83,7 +84,12 @@ class EdgeFunctionGenerator {
       final modelDef = modelDefs?[func.name];
       if (modelDef != null &&
           (modelDef.request != null || modelDef.response != null)) {
-        _generateTypedMethod(buffer, func, modelDef);
+        _generateTypedMethod(
+          buffer,
+          func,
+          modelDef,
+          flattenRequestParams: flattenRequestParams,
+        );
       } else {
         _generateUntypedMethod(buffer, func);
       }
@@ -120,14 +126,16 @@ class EdgeFunctionGenerator {
   void _generateTypedMethod(
     StringBuffer buffer,
     EdgeFunctionInfo func,
-    EdgeFunctionModelDef modelDef,
-  ) {
+    EdgeFunctionModelDef modelDef, {
+    bool flattenRequestParams = false,
+  }) {
     final methodName = ReCase(func.name).camelCase;
     final baseName = ReCase(func.name).pascalCase;
 
     final hasRequest = modelDef.request != null;
     final hasResponse = modelDef.response != null;
     final returnType = hasResponse ? '${baseName}Response' : 'FunctionResponse';
+    final flatten = flattenRequestParams && hasRequest;
 
     if (func.description != null) {
       buffer.writeln('  /// ${func.description}');
@@ -135,7 +143,9 @@ class EdgeFunctionGenerator {
 
     buffer.write('  Future<$returnType> $methodName({');
     buffer.writeln();
-    if (hasRequest) {
+    if (flatten) {
+      _writeFlattenedParams(buffer, modelDef.request!);
+    } else if (hasRequest) {
       buffer.writeln(
         '    required ${baseName}Request request,',
       );
@@ -147,7 +157,9 @@ class EdgeFunctionGenerator {
       '    final response = await _client.functions.invoke(',
     );
     buffer.writeln("      '${func.name}',");
-    if (hasRequest) {
+    if (flatten) {
+      _writeInlineBody(buffer, modelDef.request!);
+    } else if (hasRequest) {
       buffer.writeln('      body: request.toJson(),');
     }
     buffer.writeln('      headers: headers,');
@@ -173,6 +185,49 @@ class EdgeFunctionGenerator {
     }
 
     buffer.writeln('  }');
+  }
+
+  /// Writes request fields as named method parameters (flattened).
+  /// Required fields are sorted first so `required` params precede optional
+  /// ones, satisfying Dart's parameter ordering.
+  void _writeFlattenedParams(
+    StringBuffer buffer,
+    List<EdgeFunctionFieldDef> fields,
+  ) {
+    final dartType = _pgTypeToDartType;
+    final sorted = [
+      ...fields.where((f) => f.isRequired),
+      ...fields.where((f) => !f.isRequired),
+    ];
+    for (final field in sorted) {
+      final paramName = ReCase(field.name).camelCase;
+      final type = dartType(field.dataType);
+      if (field.isRequired) {
+        buffer.writeln('    required $type $paramName,');
+      } else {
+        buffer.writeln('    $type? $paramName,');
+      }
+    }
+  }
+
+  /// Writes the JSON body map inline from flattened parameters, so the
+  /// JSON keys live in generated code rather than caller code.
+  void _writeInlineBody(
+    StringBuffer buffer,
+    List<EdgeFunctionFieldDef> fields,
+  ) {
+    buffer.writeln('      body: {');
+    for (final field in fields) {
+      final paramName = ReCase(field.name).camelCase;
+      if (field.isRequired) {
+        buffer.writeln("        '${field.name}': $paramName,");
+      } else {
+        buffer.writeln(
+          "        if ($paramName != null) '${field.name}': $paramName,",
+        );
+      }
+    }
+    buffer.writeln('      },');
   }
 
   void _generateModelClass(

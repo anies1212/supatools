@@ -295,7 +295,8 @@ extension X on Y {
       );
 
       final body = generator.generateMethodBody(method, 'my_table');
-      expect(body, contains("order('created_at', ascending: false, nullsFirst: true)"));
+      expect(body,
+          contains("order('created_at', ascending: false, nullsFirst: true)"));
     });
 
     test('generates Param reference as method parameter', () {

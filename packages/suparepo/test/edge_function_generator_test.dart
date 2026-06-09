@@ -169,6 +169,80 @@ void main() {
       expect(output, isNot(contains("import 'dart:convert';")));
     });
 
+    test('flattenRequestParams expands request fields into named params', () {
+      final functions = [
+        EdgeFunctionInfo(name: 'send-email'),
+      ];
+      final modelDefs = {
+        'send-email': EdgeFunctionModelDef(
+          request: [
+            EdgeFunctionFieldDef(
+              name: 'to',
+              dataType: 'text',
+              isRequired: true,
+            ),
+            EdgeFunctionFieldDef(
+              name: 'body_html',
+              dataType: 'text',
+              isRequired: false,
+            ),
+          ],
+        ),
+      };
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+        modelDefs: modelDefs,
+        flattenRequestParams: true,
+      );
+
+      // Flattened named params instead of a request wrapper
+      expect(output, contains('required String to,'));
+      expect(output, contains('String? bodyHtml,'));
+      expect(output, isNot(contains('required SendEmailRequest request')));
+      expect(output, isNot(contains('request.toJson()')));
+
+      // JSON keys live in generated body, not in caller code
+      expect(output, contains("'to': to,"));
+      expect(output, contains("if (bodyHtml != null) 'body_html': bodyHtml,"));
+
+      // Request class is still generated for backward compatibility
+      expect(output, contains('class SendEmailRequest'));
+    });
+
+    test('flattenRequestParams sorts required params before optional', () {
+      final functions = [
+        EdgeFunctionInfo(name: 'notify'),
+      ];
+      final modelDefs = {
+        'notify': EdgeFunctionModelDef(
+          request: [
+            EdgeFunctionFieldDef(
+              name: 'note',
+              dataType: 'text',
+              isRequired: false,
+            ),
+            EdgeFunctionFieldDef(
+              name: 'user_id',
+              dataType: 'uuid',
+              isRequired: true,
+            ),
+          ],
+        ),
+      };
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+        modelDefs: modelDefs,
+        flattenRequestParams: true,
+      );
+
+      final requiredIndex = output.indexOf('required String userId,');
+      final optionalIndex = output.indexOf('String? note,');
+      expect(requiredIndex, greaterThanOrEqualTo(0));
+      expect(optionalIndex, greaterThan(requiredIndex));
+    });
+
     test('mixed typed and untyped functions', () {
       final functions = [
         EdgeFunctionInfo(name: 'untyped-func'),

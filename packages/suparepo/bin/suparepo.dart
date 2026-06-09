@@ -167,8 +167,7 @@ Future<int> _generateRepositories(
       // Resolve model import path
       String? modelImport;
       if (config.modelImportPrefix != null) {
-        final modelFile =
-            '${ReCase(table.name).snakeCase}.supafreeze.dart';
+        final modelFile = '${ReCase(table.name).snakeCase}.supafreeze.dart';
         modelImport = '${config.modelImportPrefix}$modelFile';
       } else if (config.modelImportPath != null) {
         modelImport = config.modelImportPath;
@@ -482,6 +481,7 @@ Future<int> _generateEdgeFunctionClient(
     filtered,
     modelDefs: modelDefs.isEmpty ? null : modelDefs,
     supabaseImport: config.supabaseImport,
+    flattenRequestParams: config.edgeFunctions.flattenRequestParams,
   );
 
   final outputPath = config.edgeFunctions.output ??

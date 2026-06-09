@@ -188,8 +188,7 @@ class CustomMethodMigrator {
     if (_isImportReferenced(supabaseImport, allSources)) {
       buffer.writeln("import '$supabaseImport';");
     }
-    if (modelImport != null &&
-        _isImportReferenced(modelImport, allSources)) {
+    if (modelImport != null && _isImportReferenced(modelImport, allSources)) {
       buffer.writeln("import '$modelImport';");
     }
     for (final imp in customImports) {
@@ -256,8 +255,7 @@ class CustomMethodMigrator {
         continue;
       }
       final rest = memberSource.substring(i);
-      if (rest.startsWith('async*') ||
-          rest.startsWith('sync*')) {
+      if (rest.startsWith('async*') || rest.startsWith('sync*')) {
         i += 6;
         continue;
       }
@@ -599,8 +597,7 @@ class CustomMethodMigrator {
 
         // Process the code line immediately after comments
         final codeLine = lines[i].trim();
-        if (_isFieldDeclaration(codeLine) ||
-            _isConstructorLine(codeLine)) {
+        if (_isFieldDeclaration(codeLine) || _isConstructorLine(codeLine)) {
           // Field/constructor -> skip
           i = _skipMemberBlock(lines, i);
           continue;

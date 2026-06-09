@@ -473,6 +473,7 @@ edge_functions:
   functions_path: supabase/functions  # default
   output: lib/repositories/edge_function_client.dart  # optional
   auto_detect_types: true  # Auto-detect types from TypeScript (default: true)
+  flatten_request_params: true  # Expand request fields into named params (default: false)
   include:
     - send-email
   exclude:
@@ -549,6 +550,57 @@ class SendEmailResponse {
   }
 }
 ```
+
+### Flattened Request Parameters (`flatten_request_params`)
+
+By default, a typed method takes a single `request:` wrapper object. Callers
+construct the request model themselves:
+
+```dart
+// flatten_request_params: false (default)
+await edgeFunctionClient.sendEmail(
+  request: SendEmailRequest(to: 'a@example.com', subject: 'Hi'),
+);
+```
+
+Set `flatten_request_params: true` to expand the request fields into named
+method parameters instead. The JSON body is built **inside** the generated
+method, so callers never hardcode JSON string keys:
+
+```dart
+// flatten_request_params: true
+await edgeFunctionClient.sendEmail(
+  to: 'a@example.com',
+  subject: 'Hi',
+);
+```
+
+The generated method builds the body itself:
+
+```dart
+Future<SendEmailResponse> sendEmail({
+  required String to,
+  required String subject,
+  String? bodyHtml,
+  Map<String, String>? headers,
+}) async {
+  final response = await _client.functions.invoke(
+    'send-email',
+    body: {
+      'to': to,
+      'subject': subject,
+      if (bodyHtml != null) 'body_html': bodyHtml,
+    },
+    headers: headers,
+  );
+  // ...
+}
+```
+
+> **Note:** Requires a request model (auto-detected from TypeScript or defined
+> via YAML `models`). The `SendEmailRequest` class is still generated for
+> backward compatibility. Required fields are emitted before optional ones to
+> satisfy Dart's parameter ordering.
 
 ### Error Type Generation (Freezed sealed class)
 

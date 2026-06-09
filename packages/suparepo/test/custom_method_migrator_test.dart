@@ -477,7 +477,8 @@ class UsersRepository {
         modelImport: '../models/user.supafreeze.dart',
       );
 
-      expect(code, contains('extension UsersRepositoryCustom on UsersRepository'));
+      expect(
+          code, contains('extension UsersRepositoryCustom on UsersRepository'));
       expect(code, contains("import 'users_repository.dart';"));
       // references User type -> model import present
       expect(code, contains("import '../models/user.supafreeze.dart';"));
@@ -492,8 +493,7 @@ class UsersRepository {
       final methods = [
         const MethodInfo(
           name: 'getClient',
-          source:
-              '  SupabaseClient get rawClient => client;',
+          source: '  SupabaseClient get rawClient => client;',
         ),
       ];
 
@@ -876,8 +876,7 @@ extension TestRepositoryCustom on TestRepository {
       final methods = [
         const MethodInfo(
           name: 'test',
-          source:
-              '  Future<void> test() async {\n'
+          source: '  Future<void> test() async {\n'
               '    await _client.from(tableName).select();\n'
               '  }',
         ),

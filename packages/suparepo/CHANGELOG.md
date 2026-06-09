@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.19.0] - 2026-06-10
+
+### Added
+
+- **Flattened Edge Function request parameters** (`edge_functions.flatten_request_params: true`) — typed Edge Function methods can now expand request-model fields into named method parameters instead of taking a single `request:` wrapper object. The JSON body is built inside the generated method, so callers never hardcode JSON string keys:
+  - Before: `client.sendEmail(request: SendEmailRequest(to: 'a@x.com', subject: 'Hi'))`
+  - After: `client.sendEmail(to: 'a@x.com', subject: 'Hi')`
+  - Required fields are emitted before optional ones to satisfy Dart's parameter ordering
+  - The `XRequest` model class is still generated for backward compatibility
+  - Opt-in (default `false`); requires a request model (auto-detected from TypeScript or defined via YAML `models`)
+
 ## [1.18.1] - 2026-05-20
 
 ### Fixed

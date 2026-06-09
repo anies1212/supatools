@@ -138,8 +138,7 @@ class SupaQueryGenerator {
       final arrowEnd = afterAnnotation.indexOf('=>');
 
       int methodEnd;
-      if (arrowEnd != -1 &&
-          (sigEnd == -1 || arrowEnd < sigEnd)) {
+      if (arrowEnd != -1 && (sigEnd == -1 || arrowEnd < sigEnd)) {
         // Arrow function: find the semicolon after =>
         final arrowSemiEnd = afterAnnotation.indexOf(';', arrowEnd);
         methodEnd = arrowSemiEnd != -1 ? arrowSemiEnd : afterAnnotation.length;
@@ -337,10 +336,14 @@ class SupaQueryGenerator {
     if (arrowIdx != -1 && (semiIdx == -1 || arrowIdx < semiIdx)) {
       // Arrow function: find semicolon after =>
       final arrowSemi = afterAnnotation.indexOf(';', arrowIdx);
-      blockEnd = annotationEnd + 1 + (arrowSemi != -1 ? arrowSemi + 1 : afterAnnotation.length);
+      blockEnd = annotationEnd +
+          1 +
+          (arrowSemi != -1 ? arrowSemi + 1 : afterAnnotation.length);
     } else if (braceIdx != -1 && (semiIdx == -1 || braceIdx < semiIdx)) {
       final braceEnd = _findMatchingBrace(afterAnnotation, braceIdx);
-      blockEnd = annotationEnd + 1 + (braceEnd != -1 ? braceEnd + 1 : afterAnnotation.length);
+      blockEnd = annotationEnd +
+          1 +
+          (braceEnd != -1 ? braceEnd + 1 : afterAnnotation.length);
     } else if (semiIdx != -1) {
       blockEnd = annotationEnd + 1 + semiIdx + 1;
     } else {
@@ -604,9 +607,7 @@ class SupaQueryGenerator {
       final column = m.group(1)!;
       final fullMatch = m.group(0)!;
       final isDesc = fullMatch.startsWith('OrderBy.desc');
-      final ascending = m.group(2) != null
-          ? m.group(2)! == 'true'
-          : !isDesc;
+      final ascending = m.group(2) != null ? m.group(2)! == 'true' : !isDesc;
       final nullsFirst = m.group(3) == 'true';
 
       orders.add(ParsedOrderBy(

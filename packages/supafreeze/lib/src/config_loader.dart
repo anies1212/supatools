@@ -38,6 +38,8 @@ class ConfigLoader extends BaseConfigLoader {
       relations: _parseRelationsConfig(yaml['relations']),
       generateEnums: yaml['generate_enums'] == true,
       enumOutput: yaml['enum_output']?.toString(),
+      preserveColumnOrder: yaml['preserve_column_order'] == true,
+      generateInsertModels: yaml['generate_insert_models'] == true,
     );
   }
 
@@ -140,6 +142,22 @@ class SupafreezeConfig extends BaseSupabaseConfig {
   /// Defaults to `{output}/enums`.
   final String? enumOutput;
 
+  /// When true, model fields follow the database column order instead of the
+  /// default (required-first, then grouped by Dart type). Preserving the
+  /// physical column order keeps the generated field order stable across
+  /// regenerations, avoiding churn when a column's required-ness or mapped
+  /// type changes.
+  final bool preserveColumnOrder;
+
+  /// When true, an additional `<Class>Insert` Freezed model is generated next
+  /// to each table model (same file). In the insert model, NOT NULL columns
+  /// that have a database default (e.g. `id` with `gen_random_uuid()`,
+  /// `created_at` with `now()`, or an enum/literal default) are *optional*
+  /// (nullable, omitted from JSON when null) so the database default applies.
+  /// The fetch model keeps those columns required, preserving read-time type
+  /// safety. Additive and opt-in (default false).
+  final bool generateInsertModels;
+
   const SupafreezeConfig({
     super.url,
     super.secretKey,
@@ -153,6 +171,8 @@ class SupafreezeConfig extends BaseSupabaseConfig {
     this.relations,
     this.generateEnums = false,
     this.enumOutput,
+    this.preserveColumnOrder = false,
+    this.generateInsertModels = false,
   });
 
   /// Gets the resolved enum output directory

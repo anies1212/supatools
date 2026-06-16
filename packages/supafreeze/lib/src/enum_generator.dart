@@ -111,7 +111,11 @@ class EnumGenerator {
   /// - `in-progress` → `inProgress`
   /// - `123abc` → `$123abc`
   /// - `class` → `class$`
-  String _sanitizeEnumValue(String pgValue) {
+  String _sanitizeEnumValue(String pgValue) => sanitizeEnumValue(pgValue);
+
+  /// Public, stateless variant of [_sanitizeEnumValue] so other generators
+  /// (e.g. default-value parsing) can derive the same enum member identifier.
+  static String sanitizeEnumValue(String pgValue) {
     // Convert to camelCase (handles hyphens, underscores, spaces)
     var dartName = ReCase(pgValue).camelCase;
 

@@ -125,7 +125,77 @@ class FreezedGenerator {
 
     buffer.writeln('}');
 
+    // Optional insert model: DB-default NOT NULL columns become optional.
+    if (_config?.generateInsertModels == true) {
+      buffer.writeln();
+      _writeInsertClass(buffer, table, className);
+    }
+
     return buffer.toString();
+  }
+
+  /// Appends a `<Class>Insert` model where NOT NULL columns that have a
+  /// database default are optional (nullable, omitted from JSON when null) so
+  /// the database default applies on insert. Columns without a default stay
+  /// required.
+  void _writeInsertClass(
+    StringBuffer buffer,
+    TableInfo table,
+    String className,
+  ) {
+    final insertClass = '${className}Insert';
+
+    buffer.writeln('/// Insert model for `${table.name}`.');
+    buffer.writeln('///');
+    buffer.writeln(
+      '/// NOT NULL columns with a database default are optional here so the '
+      'database',
+    );
+    buffer.writeln('/// default applies when the field is omitted.');
+    buffer.writeln('@freezed');
+    buffer.writeln('abstract class $insertClass with _\$$insertClass {');
+    buffer.writeln('  const factory $insertClass({');
+
+    for (final column in _sortColumns(table.columns)) {
+      buffer.writeln('    ${_generateInsertField(column)}');
+    }
+
+    buffer.writeln('  }) = _$insertClass;');
+    buffer.writeln();
+    buffer.writeln(
+      '  factory $insertClass.fromJson(Map<String, dynamic> json) => '
+      '_\$${insertClass}FromJson(json);',
+    );
+    buffer.writeln('}');
+  }
+
+  /// Generates a single field definition for an insert model.
+  ///
+  /// A column is required only when it is NOT NULL *and* has no database
+  /// default. Everything else (nullable, or NOT NULL with a default such as a
+  /// primary key's `gen_random_uuid()` or `now()`) is optional and omitted
+  /// from JSON when null.
+  String _generateInsertField(ColumnInfo column) {
+    final rawFieldName = ReCase(column.name).camelCase;
+    final fieldName = _escapeFieldName(rawFieldName);
+    final dartType = TypeMapper.mapType(column.dataType);
+
+    final isRequired = !column.isNullable && column.defaultValue == null;
+
+    final jsonKeyArgs = <String>[];
+    if (fieldName != column.name || rawFieldName != fieldName) {
+      jsonKeyArgs.add("name: '${column.name}'");
+    }
+    if (!isRequired) {
+      jsonKeyArgs.add('includeIfNull: false');
+    }
+    final jsonKey =
+        jsonKeyArgs.isEmpty ? '' : '@JsonKey(${jsonKeyArgs.join(', ')}) ';
+
+    if (isRequired) {
+      return '${jsonKey}required $dartType $fieldName,';
+    }
+    return '$jsonKey$dartType? $fieldName,';
   }
 
   /// Gets imports needed for enum types used in the table
@@ -217,8 +287,15 @@ class FreezedGenerator {
     return ReCase(columnName).camelCase;
   }
 
-  /// Sorts columns: required fields first, then grouped by Dart type
+  /// Sorts columns: required fields first, then grouped by Dart type.
+  ///
+  /// When `preserveColumnOrder` is enabled, the physical database column order
+  /// is kept as-is for stable, churn-free output.
   List<ColumnInfo> _sortColumns(List<ColumnInfo> columns) {
+    if (_config?.preserveColumnOrder == true) {
+      return List<ColumnInfo>.from(columns);
+    }
+
     // Determine if each column is required
     bool isRequired(ColumnInfo col) {
       final hasDefault = col.defaultValue != null && !col.isPrimaryKey;
@@ -308,7 +385,11 @@ class FreezedGenerator {
 
     // Add default value annotation if applicable
     if (hasDefault && !column.isNullable) {
-      final defaultValue = _parseDefaultValue(column.defaultValue!, dartType);
+      final defaultValue = _parseDefaultValue(
+        column.defaultValue!,
+        dartType,
+        column.dataType,
+      );
       if (defaultValue != null) {
         buffer.write('@Default($defaultValue) ');
       } else {
@@ -325,9 +406,18 @@ class FreezedGenerator {
   }
 
   /// Parses a PostgreSQL default value to a Dart literal
-  String? _parseDefaultValue(String pgDefault, String dartType) {
+  String? _parseDefaultValue(String pgDefault, String dartType,
+      [String? pgType]) {
     // Handle common default patterns
     final trimmed = pgDefault.trim();
+
+    // Enum defaults: `'pending'::status` → `Status.pending`.
+    // Done before the generic cast strip so schema-qualified casts
+    // (`::public.status`) are handled too.
+    if (pgType != null) {
+      final enumDefault = _parseEnumDefault(trimmed, pgType);
+      if (enumDefault != null) return enumDefault;
+    }
 
     // Remove type casts like ::text, ::integer
     final withoutCast = trimmed.replaceAll(RegExp(r'::\w+'), '');
@@ -374,6 +464,28 @@ class FreezedGenerator {
     }
 
     return null;
+  }
+
+  /// Parses a scalar enum default like `'pending'::bond_story_status` into a
+  /// Dart enum member reference (`BondStoryStatus.pending`). Returns null when
+  /// [pgType] is not a registered enum, enum generation is disabled, or the
+  /// default value is not one of the enum's known values.
+  String? _parseEnumDefault(String pgDefault, String pgType) {
+    if (!TypeMapper.useEnumTypes) return null;
+    final base =
+        pgType.endsWith('[]') ? pgType.substring(0, pgType.length - 2) : pgType;
+    if (!TypeMapper.isCustomEnum(base)) return null;
+
+    final match = RegExp(r"'([^']*)'").firstMatch(pgDefault);
+    if (match == null) return null;
+    final value = match.group(1)!;
+
+    final values = TypeMapper.getEnumValues(base);
+    if (values == null || !values.contains(value)) return null;
+
+    final enumClass = TypeMapper.enumTypeName(base);
+    final member = EnumGenerator.sanitizeEnumValue(value);
+    return '$enumClass.$member';
   }
 
   /// Generates all models and returns a map of filename to content

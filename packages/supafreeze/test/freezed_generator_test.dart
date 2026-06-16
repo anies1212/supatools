@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
+import 'package:supafreeze/src/config_loader.dart';
 import 'package:supafreeze/src/freezed_generator.dart';
 
 void main() {
@@ -10,6 +11,79 @@ void main() {
   });
 
   group('FreezedGenerator', () {
+    group('generateInsertModels', () {
+      final table = TableInfo(
+        name: 'bond_story_purchases',
+        columns: [
+          ColumnInfo(
+            name: 'id',
+            dataType: 'uuid',
+            isNullable: false,
+            isPrimaryKey: true,
+            defaultValue: 'gen_random_uuid()',
+          ),
+          ColumnInfo(
+            name: 'created_at',
+            dataType: 'timestamptz',
+            isNullable: false,
+            defaultValue: 'now()',
+          ),
+          ColumnInfo(name: 'bond_id', dataType: 'uuid', isNullable: false),
+          ColumnInfo(name: 'note', dataType: 'text', isNullable: true),
+        ],
+      );
+
+      test('does not emit insert model by default', () {
+        final result = generator.generateModel(table);
+        expect(result, isNot(contains('BondStoryPurchasesInsert')));
+      });
+
+      test('emits insert model with default-backed columns optional', () {
+        final gen = FreezedGenerator();
+        gen.setConfig(const SupafreezeConfig(generateInsertModels: true));
+        final result = gen.generateModel(table);
+
+        expect(result, contains('abstract class BondStoryPurchasesInsert'));
+        // NOT NULL, no default → required.
+        expect(result, contains('required String bondId,'));
+        // NOT NULL but DB default → optional + omit-if-null.
+        expect(result, contains('@JsonKey(includeIfNull: false) String? id,'));
+        expect(
+          result,
+          contains(
+            "@JsonKey(name: 'created_at', includeIfNull: false) "
+            'DateTime? createdAt,',
+          ),
+        );
+        // nullable column → optional.
+        expect(result, contains('String? note,'));
+        // The fetch model keeps id/created_at required.
+        expect(result, contains('required String id,'));
+      });
+    });
+
+    group('preserveColumnOrder', () {
+      final table = TableInfo(
+        name: 'items',
+        columns: [
+          ColumnInfo(name: 'zebra', dataType: 'text', isNullable: true),
+          ColumnInfo(name: 'id', dataType: 'uuid', isNullable: false),
+        ],
+      );
+
+      test('default order sorts required-first (id before zebra)', () {
+        final result = generator.generateModel(table);
+        expect(result.indexOf('id,'), lessThan(result.indexOf('zebra,')));
+      });
+
+      test('preserves DB column order when enabled (zebra before id)', () {
+        final gen = FreezedGenerator();
+        gen.setConfig(const SupafreezeConfig(preserveColumnOrder: true));
+        final result = gen.generateModel(table);
+        expect(result.indexOf('zebra,'), lessThan(result.indexOf('id,')));
+      });
+    });
+
     group('generateModel', () {
       test('generates basic model correctly', () {
         final table = TableInfo(
@@ -144,6 +218,81 @@ void main() {
     group('enum type fields', () {
       setUp(() {
         TypeMapper.clearEnums();
+      });
+
+      tearDown(() {
+        TypeMapper.clearEnums();
+      });
+
+      test('enum default → @Default(Enum.member), not required', () {
+        TypeMapper.registerEnum('bond_story_status', ['pending', 'purchased']);
+        TypeMapper.useEnumTypes = true;
+
+        final table = TableInfo(
+          name: 'bond_story_purchases',
+          columns: [
+            ColumnInfo(
+              name: 'status',
+              dataType: 'bond_story_status',
+              isNullable: false,
+              defaultValue: "'pending'::bond_story_status",
+            ),
+          ],
+        );
+
+        final gen = FreezedGenerator();
+        gen.enumImportPrefix = 'enums/';
+        final result = gen.generateModel(table);
+
+        expect(result, contains('@Default(BondStoryStatus.pending)'));
+        expect(result, contains('BondStoryStatus status'));
+        expect(result, isNot(contains('required BondStoryStatus status')));
+      });
+
+      test('enum default with schema-qualified cast', () {
+        TypeMapper.registerEnum('order_status', ['pending', 'shipped']);
+        TypeMapper.useEnumTypes = true;
+
+        final table = TableInfo(
+          name: 'orders',
+          columns: [
+            ColumnInfo(
+              name: 'status',
+              dataType: 'order_status',
+              isNullable: false,
+              defaultValue: "'shipped'::public.order_status",
+            ),
+          ],
+        );
+
+        final gen = FreezedGenerator();
+        gen.enumImportPrefix = 'enums/';
+        final result = gen.generateModel(table);
+
+        expect(result, contains('@Default(OrderStatus.shipped)'));
+      });
+
+      test('unknown enum default value falls back to required', () {
+        TypeMapper.registerEnum('order_status', ['pending', 'shipped']);
+        TypeMapper.useEnumTypes = true;
+
+        final table = TableInfo(
+          name: 'orders',
+          columns: [
+            ColumnInfo(
+              name: 'status',
+              dataType: 'order_status',
+              isNullable: false,
+              defaultValue: "'mystery'::order_status",
+            ),
+          ],
+        );
+
+        final gen = FreezedGenerator();
+        gen.enumImportPrefix = 'enums/';
+        final result = gen.generateModel(table);
+
+        expect(result, contains('required OrderStatus status'));
       });
 
       test('generates enum type field when useEnumTypes is true', () {

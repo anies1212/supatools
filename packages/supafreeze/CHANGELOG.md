@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-06-17
+
+### Added
+
+- **`generate_insert_models`** — emits a `<Class>Insert` Freezed model alongside each table model (same file). NOT NULL columns that carry a database default (e.g. a primary key's `gen_random_uuid()`, `created_at`'s `now()`, or an enum/literal default) are optional there and omitted from JSON when null, so the database default applies on insert. The fetch model keeps those columns required, preserving read-time type safety. Opt-in (default `false`), additive and non-breaking.
+- **`preserve_column_order`** — keeps generated field order aligned to the physical database column order instead of the default (required-first, then grouped by Dart type). Avoids churn when a column's required-ness or mapped type changes. Opt-in (default `false`).
+
+### Fixed
+
+- **Enum columns with a literal default** (e.g. `status DEFAULT 'pending'::bond_story_status`) now generate `@Default(BondStoryStatus.pending)` instead of falling back to `required`, restoring optional construction. This regressed when enum auto-generation made such columns map to a Dart enum type that the default-value parser didn't handle. Schema-qualified casts (`::public.status`) are handled; unknown values still fall back to `required`.
+
 ## [2.1.1] - 2026-03-11
 
 ### Fixed

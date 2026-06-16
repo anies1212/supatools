@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.21.0 / supafreeze 2.2.0] - 2026-06-17
+
+### Added
+
+- **suparepo**: Generate Freezed success-response DTOs for Edge Functions from
+  the handler's exported TypeScript interface. A `<PascalName>Response`
+  interface is parsed directly; otherwise the success `jsonResponse({...})`
+  call is parsed and property types are recovered from referenced
+  functions/variables (`viewSavedCards(...): SavedDailyCardView[]` →
+  `List<...>`). Nested objects become nested Freezed classes, `T | null`
+  becomes nullable, `string[]` becomes `List<String>`, and snake_case keys map
+  via `@JsonKey`. Files are written to `edge_functions.response_models_output`
+  (default: next to the client), and the typed client method returns the
+  generated `<Name>Response`. Functions without a recoverable response shape are
+  skipped (backward compatible).
+- **supafreeze**: `generate_insert_models` option emits a `<Class>Insert`
+  Freezed model alongside each table model. NOT NULL columns that carry a
+  database default (e.g. a primary key's `gen_random_uuid()`, `created_at`'s
+  `now()`, or an enum/literal default) are optional there (omitted from JSON
+  when null), while the fetch model keeps them required.
+- **supafreeze**: `preserve_column_order` option keeps generated field order
+  aligned to the physical database column order, avoiding churn when a column's
+  required-ness or mapped type changes.
+
+### Fixed
+
+- **supafreeze**: Enum columns with a literal default (e.g.
+  `status DEFAULT 'pending'::bond_story_status`) now generate
+  `@Default(BondStoryStatus.pending)` instead of falling back to `required`,
+  restoring optional construction for insert. Handles schema-qualified casts;
+  unknown values still fall back to `required`.
+
 ## [suparepo 1.16.0 / supa_query_annotation 0.1.0] - 2026-04-15
 
 ### Added

@@ -56,8 +56,15 @@ export 'src/rpc_generator.dart' show RpcGenerator;
 export 'src/rpc_result_model_generator.dart' show RpcResultModelGenerator;
 export 'src/edge_function_detector.dart' show EdgeFunctionDetector;
 export 'src/edge_function_generator.dart' show EdgeFunctionGenerator;
+export 'src/edge_function_response_generator.dart'
+    show EdgeFunctionResponseGenerator;
 export 'src/edge_function_info.dart'
-    show EdgeFunctionInfo, EdgeFunctionFieldDef, EdgeFunctionModelDef;
+    show
+        EdgeFunctionInfo,
+        EdgeFunctionFieldDef,
+        EdgeFunctionModelDef,
+        EdgeFunctionResponseField;
 export 'src/ts_type_extractor.dart' show TsTypeExtractor, TsTypeExtractorLoader;
+export 'src/ts_response_type_parser.dart' show TsResponseTypeParser;
 export 'src/supa_query_generator.dart'
     show SupaQueryGenerator, SupaQueryMethodInfo;

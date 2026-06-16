@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.21.0] - 2026-06-17
+
+### Added
+
+- **Edge Function success-response DTOs.** Generate Freezed response models for Edge Functions from the handler's TypeScript types, so callers no longer hand-parse response JSON. Two strategies, in priority order:
+  - An exported `export interface <PascalName>Response { ... }` is parsed directly.
+  - Otherwise the success `jsonResponse({ ... })` call is parsed, and each property's type is recovered from referenced functions/variables whose return/declared type points at an interface (e.g. `viewSavedCards(...): SavedDailyCardView[]` → `List<...>`), falling back to a name/value heuristic.
+
+  Nested objects become nested Freezed classes, `T | null` becomes nullable, `string[]` becomes `List<String>`, and snake_case keys map via `@JsonKey`. Files are written to `edge_functions.response_models_output` (default: next to the client file), and the typed client method returns the generated `<Name>Response` (decoded via `fromJson`). Because the recovered shape mirrors the *actual* response (partial projections + computed fields), `fromJson` parses real responses without throwing. Functions without a recoverable response shape are skipped (backward compatible).
+
+  New config: `edge_functions.response_models_output`.
+
 ## [1.20.1] - 2026-06-10
 
 ### Fixed

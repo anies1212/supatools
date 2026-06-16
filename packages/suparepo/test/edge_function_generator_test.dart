@@ -133,6 +133,40 @@ void main() {
       expect(output, contains("import 'dart:convert';"));
     });
 
+    test('responseObject → returns Freezed DTO and imports its file', () {
+      final functions = [EdgeFunctionInfo(name: 'get_daily_card')];
+      final modelDefs = {
+        'get_daily_card': const EdgeFunctionModelDef(
+          responseObject: [
+            EdgeFunctionResponseField(
+              jsonKey: 'card_date',
+              dartScalarType: 'String',
+            ),
+          ],
+        ),
+      };
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+        modelDefs: modelDefs,
+        responseModelsImportPrefix: 'functions/',
+      );
+
+      // Imports the generated DTO file with the configured prefix.
+      expect(
+        output,
+        contains("import 'functions/get_daily_card_response.dart';"),
+      );
+      // No inline plain response class is emitted for the DTO path.
+      expect(output, isNot(contains('class GetDailyCardResponse {')));
+      // Typed method returns the DTO and decodes via fromJson.
+      expect(
+        output,
+        contains('Future<GetDailyCardResponse> getDailyCard'),
+      );
+      expect(output, contains('GetDailyCardResponse.fromJson(json)'));
+    });
+
     test('generates with type definitions (request only)', () {
       final functions = [
         EdgeFunctionInfo(name: 'notify'),

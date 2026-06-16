@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'edge_function_info.dart';
+import 'ts_response_type_parser.dart';
 
 /// Infers Edge Function request/response types from TypeScript source
 class TsTypeExtractor {
@@ -17,6 +18,7 @@ class TsTypeExtractor {
     required String indexSource,
     String? handlerSource,
     bool inferRequestFromUsage = false,
+    String? functionName,
   }) {
     final source = _removeComments(
       handlerSource != null ? '$indexSource\n$handlerSource' : indexSource,
@@ -29,7 +31,21 @@ class TsTypeExtractor {
     final response = _extractResponseFields(source);
     final errors = _extractErrorCodes(source);
 
-    if (request == null && response == null && errors == null) {
+    // Rich success-response DTO recovered from exported interfaces (preferred)
+    // or the jsonResponse({...}) call (fallback). Requires the function name
+    // to resolve the `<PascalName>Response` interface convention.
+    final responseObject = functionName == null
+        ? null
+        : const TsResponseTypeParser().parse(
+            functionName: functionName,
+            indexSource: indexSource,
+            handlerSource: handlerSource,
+          );
+
+    if (request == null &&
+        response == null &&
+        errors == null &&
+        responseObject == null) {
       return null;
     }
 
@@ -37,6 +53,7 @@ class TsTypeExtractor {
       request: request,
       response: response,
       errors: errors,
+      responseObject: responseObject,
     );
   }
 
@@ -440,6 +457,7 @@ class TsTypeExtractorLoader {
       indexSource: indexSource,
       handlerSource: handlerSource,
       inferRequestFromUsage: inferRequestFromUsage,
+      functionName: p.basename(functionDirPath),
     );
   }
 }

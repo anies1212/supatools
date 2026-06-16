@@ -11,6 +11,35 @@ void main() {
   });
 
   group('TsTypeExtractor', () {
+    test('populates responseObject from exported <Name>Response interface', () {
+      const source = '''
+export interface GetDailyCardResponse {
+  card_date: string;
+  body: string | null;
+}
+export const handler = async (req) => jsonResponse({ card_date: "x" });
+''';
+      final result = extractor.extract(
+        indexSource: source,
+        functionName: 'get_daily_card',
+      );
+
+      expect(result, isNotNull);
+      expect(result!.responseObject, isNotNull);
+      expect(result.responseObject, hasLength(2));
+      final body =
+          result.responseObject!.firstWhere((f) => f.jsonKey == 'body');
+      expect(body.nullable, isTrue);
+    });
+
+    test('responseObject is null when functionName is omitted', () {
+      const source = '''
+export interface FooResponse { ok: boolean; }
+''';
+      final result = extractor.extract(indexSource: source);
+      expect(result?.responseObject, isNull);
+    });
+
     group('request type extraction', () {
       test('extracts fields from body as { ... } pattern', () {
         const source = '''

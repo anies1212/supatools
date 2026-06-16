@@ -11,6 +11,7 @@ import 'package:suparepo/src/rpc_generator.dart';
 import 'package:suparepo/src/rpc_result_model_generator.dart';
 import 'package:suparepo/src/edge_function_detector.dart';
 import 'package:suparepo/src/edge_function_generator.dart';
+import 'package:suparepo/src/edge_function_response_generator.dart';
 import 'package:suparepo/src/ts_type_extractor.dart';
 import 'package:suparepo/src/edge_function_info.dart';
 import 'package:path/path.dart' as p;
@@ -485,23 +486,57 @@ Future<int> _generateEdgeFunctionClient(
     modelDefs = {...modelDefs, ...merged};
   }
 
+  final outputPath = config.edgeFunctions.output ??
+      p.join(config.output, 'edge_function_client.dart');
+  final edgeOutputDir = p.dirname(outputPath);
+
+  // Generate Freezed success-response DTO files (one per function with a
+  // recovered response shape) and resolve the import prefix for the client.
+  var generated = 0;
+  var responseModelsImportPrefix = '';
+
+  if (modelDefs.isNotEmpty) {
+    final responseGenerator = const EdgeFunctionResponseGenerator();
+    final responseFiles =
+        responseGenerator.generateAllResponseModels(modelDefs);
+
+    if (responseFiles.isNotEmpty) {
+      final responseDir =
+          config.edgeFunctions.responseModelsOutput ?? edgeOutputDir;
+      final responseDirectory = Directory(responseDir);
+      if (!await responseDirectory.exists()) {
+        await responseDirectory.create(recursive: true);
+      }
+
+      for (final entry in responseFiles.entries) {
+        final responsePath = p.join(responseDir, entry.key);
+        await File(responsePath).writeAsString(entry.value);
+        print('✨ Generated: $responsePath');
+        generated++;
+      }
+
+      if (p.normalize(responseDir) != p.normalize(edgeOutputDir)) {
+        responseModelsImportPrefix =
+            '${p.relative(responseDir, from: edgeOutputDir)}/';
+      }
+    }
+  }
+
   final generator = EdgeFunctionGenerator();
   final content = generator.generateEdgeFunctionClient(
     filtered,
     modelDefs: modelDefs.isEmpty ? null : modelDefs,
     supabaseImport: config.supabaseImport,
     flattenRequestParams: config.edgeFunctions.flattenRequestParams,
+    responseModelsImportPrefix: responseModelsImportPrefix,
   );
-
-  final outputPath = config.edgeFunctions.output ??
-      p.join(config.output, 'edge_function_client.dart');
 
   final outputFile = File(outputPath);
   await outputFile.parent.create(recursive: true);
   await outputFile.writeAsString(content);
   print('✨ Generated: $outputPath');
 
-  var generated = 1;
+  generated++;
 
   // Generate error class files
   if (modelDefs.isNotEmpty) {

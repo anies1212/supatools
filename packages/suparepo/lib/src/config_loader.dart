@@ -133,6 +133,7 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       autoDetectTypes: value['auto_detect_types'] != false,
       flattenRequestParams: value['flatten_request_params'] == true,
       inferRequestFromUsage: value['infer_request_from_usage'] == true,
+      responseModelsOutput: value['response_models_output']?.toString(),
     );
   }
 
@@ -267,6 +268,12 @@ class EdgeFunctionConfig {
   /// declaring a request type.
   final bool inferRequestFromUsage;
 
+  /// Output directory for generated Freezed success-response DTO files
+  /// (`<function_name>_response.dart`). When null, the DTOs are written next
+  /// to the Edge Function client file. The typed client method returns the
+  /// generated `<Name>Response` DTO when a response shape was recovered.
+  final String? responseModelsOutput;
+
   const EdgeFunctionConfig({
     this.enabled = false,
     this.output,
@@ -277,6 +284,7 @@ class EdgeFunctionConfig {
     this.autoDetectTypes = true,
     this.flattenRequestParams = false,
     this.inferRequestFromUsage = false,
+    this.responseModelsOutput,
   });
 
   /// Checks if a function should be included

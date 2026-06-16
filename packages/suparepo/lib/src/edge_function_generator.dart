@@ -1,6 +1,7 @@
 import 'package:recase/recase.dart';
 import 'config_loader.dart';
 import 'edge_function_info.dart';
+import 'edge_function_response_generator.dart';
 
 /// Generates a Supabase Edge Function client class
 class EdgeFunctionGenerator {
@@ -13,6 +14,7 @@ class EdgeFunctionGenerator {
     Map<String, EdgeFunctionModelDef>? modelDefs,
     String supabaseImport = defaultSupabaseImport,
     bool flattenRequestParams = false,
+    String responseModelsImportPrefix = '',
   }) {
     final buffer = StringBuffer();
 
@@ -32,11 +34,24 @@ class EdgeFunctionGenerator {
     // dart:convert is only used when a typed response is decoded
     // (jsonDecode + utf8.decode). Request-only models don't need it.
     final hasResponseModels = modelDefs != null &&
-        functions.any((f) => modelDefs[f.name]?.response != null);
+        functions.any((f) =>
+            modelDefs[f.name]?.response != null ||
+            modelDefs[f.name]?.responseObject != null);
     if (hasResponseModels) {
       buffer.writeln(
         "import 'dart:convert';",
       );
+    }
+
+    // Import the generated Freezed response DTO files (one per function that
+    // has a recovered response shape).
+    if (modelDefs != null) {
+      for (final func in functions) {
+        if (modelDefs[func.name]?.responseObject == null) continue;
+        final fileName =
+            EdgeFunctionResponseGenerator.responseFileName(func.name);
+        buffer.writeln("import '$responseModelsImportPrefix$fileName';");
+      }
     }
 
     buffer.writeln();
@@ -57,7 +72,9 @@ class EdgeFunctionGenerator {
           );
           buffer.writeln();
         }
-        if (modelDef.response != null) {
+        // The flat `response` heuristic generates an inline class only when no
+        // rich `responseObject` DTO (separate Freezed file) was recovered.
+        if (modelDef.response != null && modelDef.responseObject == null) {
           _generateModelClass(
             buffer,
             '${baseName}Response',
@@ -83,7 +100,9 @@ class EdgeFunctionGenerator {
       buffer.writeln();
       final modelDef = modelDefs?[func.name];
       if (modelDef != null &&
-          (modelDef.request != null || modelDef.response != null)) {
+          (modelDef.request != null ||
+              modelDef.response != null ||
+              modelDef.responseObject != null)) {
         _generateTypedMethod(
           buffer,
           func,
@@ -133,7 +152,8 @@ class EdgeFunctionGenerator {
     final baseName = ReCase(func.name).pascalCase;
 
     final hasRequest = modelDef.request != null;
-    final hasResponse = modelDef.response != null;
+    final hasResponse =
+        modelDef.response != null || modelDef.responseObject != null;
     final returnType = hasResponse ? '${baseName}Response' : 'FunctionResponse';
     final flatten = flattenRequestParams && hasRequest;
 

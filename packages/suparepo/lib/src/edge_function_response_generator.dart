@@ -81,7 +81,10 @@ class EdgeFunctionResponseGenerator {
       final jsonKeyAnno =
           fieldName != field.jsonKey ? "@JsonKey(name: '${field.jsonKey}') " : '';
       if (field.nullable) {
-        buffer.writeln('    $jsonKeyAnno$type? $fieldName,');
+        // `dynamic` is already nullable; `dynamic?` is a lint, so omit the `?`
+        // (and the field stays optional without `required`).
+        final nullableType = type == 'dynamic' ? 'dynamic' : '$type?';
+        buffer.writeln('    $jsonKeyAnno$nullableType $fieldName,');
       } else {
         buffer.writeln('    ${jsonKeyAnno}required $type $fieldName,');
       }

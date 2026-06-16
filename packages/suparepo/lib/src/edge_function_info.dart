@@ -79,6 +79,28 @@ class EdgeFunctionResponseField {
       'list: $isList, nullable: $nullable)';
 }
 
+/// A table column made available to Edge Function response inference.
+///
+/// Carries the already-resolved Dart type (and nullability) so the response
+/// parser can type the columns of a `.select(...)` projection without depending
+/// on the schema/type-mapping layer. `dartType` must be a self-contained Dart
+/// type that needs no extra import (e.g. `String`, `int`, `DateTime`,
+/// `List<String>`, `Map<String, dynamic>`, `dynamic`).
+class EfTableColumn {
+  final String name;
+  final String dartType;
+  final bool nullable;
+
+  const EfTableColumn({
+    required this.name,
+    required this.dartType,
+    this.nullable = false,
+  });
+
+  @override
+  String toString() => 'EfTableColumn($name: $dartType, nullable: $nullable)';
+}
+
 /// Model definition for an Edge Function (request + response + errors)
 class EdgeFunctionModelDef {
   final List<EdgeFunctionFieldDef>? request;

@@ -83,6 +83,18 @@ void main() {
       );
     });
 
+    test('nullable dynamic field omits the redundant `?`', () {
+      final content = generator.generateResponseModel('get_x', const [
+        EdgeFunctionResponseField(
+          jsonKey: 'headings',
+          dartScalarType: 'dynamic',
+          nullable: true,
+        ),
+      ]);
+      expect(content, contains('    dynamic headings,'));
+      expect(content, isNot(contains('dynamic? headings')));
+    });
+
     test('list of scalars → List<String>', () {
       final content = generator.generateResponseModel('get_tags', const [
         EdgeFunctionResponseField(

@@ -19,6 +19,7 @@ class TsTypeExtractor {
     String? handlerSource,
     bool inferRequestFromUsage = false,
     String? functionName,
+    Map<String, List<EfTableColumn>>? tableSchemas,
   }) {
     final source = _removeComments(
       handlerSource != null ? '$indexSource\n$handlerSource' : indexSource,
@@ -40,6 +41,7 @@ class TsTypeExtractor {
             functionName: functionName,
             indexSource: indexSource,
             handlerSource: handlerSource,
+            tableSchemas: tableSchemas,
           );
 
     if (request == null &&
@@ -440,6 +442,7 @@ class TsTypeExtractorLoader {
   Future<EdgeFunctionModelDef?> extractFromDirectory(
     String functionDirPath, {
     bool inferRequestFromUsage = false,
+    Map<String, List<EfTableColumn>>? tableSchemas,
   }) async {
     final indexFile = File(p.join(functionDirPath, 'index.ts'));
     if (!await indexFile.exists()) return null;
@@ -458,6 +461,7 @@ class TsTypeExtractorLoader {
       handlerSource: handlerSource,
       inferRequestFromUsage: inferRequestFromUsage,
       functionName: p.basename(functionDirPath),
+      tableSchemas: tableSchemas,
     );
   }
 }

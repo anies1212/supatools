@@ -149,6 +149,183 @@ export const handler = async (req) => {
       });
     });
 
+    group('select-projection inference (strategy 3)', () {
+      final schemas = {
+        'daily_cards': const [
+          EfTableColumn(name: 'card_date', dartType: 'String'),
+          EfTableColumn(name: 'body', dartType: 'String', nullable: true),
+          EfTableColumn(name: 'feedback_rating', dartType: 'int', nullable: true),
+          EfTableColumn(name: 'generated_at', dartType: 'DateTime'),
+          EfTableColumn(name: 'user_id', dartType: 'String'),
+        ],
+        'wishes': const [
+          EfTableColumn(name: 'id', dartType: 'String'),
+          EfTableColumn(name: 'title', dartType: 'String'),
+        ],
+        'bonds': const [
+          EfTableColumn(name: 'id', dartType: 'String'),
+        ],
+      };
+
+      test('spread of single-row select → typed nested object', () {
+        const source = '''
+export const handler = async (req) => {
+  const { data } = await client
+    .from("daily_cards")
+    .select("card_date, body, feedback_rating, generated_at")
+    .eq("user_id", auth.userId)
+    .maybeSingle();
+  return jsonResponse({ card: { ...data, is_saved: saved !== null } });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_daily_card',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+
+        final card = field(result!, 'card');
+        expect(card.isObject, isTrue);
+        expect(card.isList, isFalse);
+        // Only selected columns + the extra computed field.
+        final keys = card.objectFields!.map((f) => f.jsonKey).toSet();
+        expect(keys, {
+          'card_date',
+          'body',
+          'feedback_rating',
+          'generated_at',
+          'is_saved',
+        });
+        // user_id was NOT selected → must be absent.
+        expect(keys, isNot(contains('user_id')));
+        // Column types/nullability come from the schema.
+        expect(field(card.objectFields!, 'card_date').dartScalarType, 'String');
+        expect(field(card.objectFields!, 'card_date').nullable, isFalse);
+        expect(field(card.objectFields!, 'body').nullable, isTrue);
+        expect(field(card.objectFields!, 'generated_at').dartScalarType,
+            'DateTime');
+        // Computed property typed by heuristic.
+        expect(field(card.objectFields!, 'is_saved').dartScalarType, 'bool');
+      });
+
+      test('bare select var without maybeSingle → List<object>', () {
+        const source = '''
+export const handler = async (req) => {
+  const { data } = await client.from("wishes").select("id, title").eq("u", x);
+  return jsonResponse({ wishes: data });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_wishes',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+
+        final wishes = field(result!, 'wishes');
+        expect(wishes.isObject, isTrue);
+        expect(wishes.isList, isTrue);
+        expect(wishes.objectFields, hasLength(2));
+      });
+
+      test('column alias a:b uses alias as key, source column type', () {
+        const source = '''
+export const handler = async (req) => {
+  const { data } = await client.from("daily_cards")
+    .select("when:card_date, body").maybeSingle();
+  return jsonResponse({ card: { ...data } });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_daily_card',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+        final card = field(result!, 'card');
+        final keys = card.objectFields!.map((f) => f.jsonKey).toSet();
+        expect(keys, {'when', 'body'});
+        expect(field(card.objectFields!, 'when').dartScalarType, 'String');
+      });
+
+      test('select("*") expands to all table columns', () {
+        const source = '''
+export const handler = async (req) => {
+  const { data } = await client.from("wishes").select("*").maybeSingle();
+  return jsonResponse({ wish: { ...data } });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_wish',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+        expect(field(result!, 'wish').objectFields, hasLength(2));
+      });
+
+      test('relation embed → safe dynamic fallback', () {
+        const source = '''
+export const handler = async (req) => {
+  const { data } = await client.from("wishes")
+    .select("id, bond:bonds(*)").maybeSingle();
+  return jsonResponse({ wish: { ...data } });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_wish',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+        final wish = field(result!, 'wish');
+        expect(wish.isObject, isFalse);
+        expect(wish.dartScalarType, 'dynamic');
+      });
+
+      test('.map() reshaping → safe dynamic fallback', () {
+        const source = '''
+export const handler = async (req) => {
+  const { data } = await client.from("wishes").select("id, title");
+  return jsonResponse({ luckyDays: data.map((d) => ({ x: d.id })) });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_lucky_days',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+        expect(field(result!, 'luckyDays').dartScalarType, 'dynamic');
+      });
+
+      test('off by default (no tableSchemas) → dynamic, as in 1.21.0', () {
+        const source = '''
+export const handler = async (req) => {
+  const { data } = await client.from("daily_cards").select("card_date").maybeSingle();
+  return jsonResponse({ card: { ...data, is_saved: saved !== null } });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_daily_card',
+          indexSource: source,
+        );
+        expect(field(result!, 'card').dartScalarType, 'dynamic');
+      });
+
+      test('strategy 1 interface still wins over select inference', () {
+        const source = '''
+export interface GetDailyCardResponse { ok: boolean; }
+export const handler = async (req) => {
+  const { data } = await client.from("daily_cards").select("card_date").maybeSingle();
+  return jsonResponse({ card: { ...data } });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_daily_card',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+        expect(result, hasLength(1));
+        expect(result!.first.jsonKey, 'ok');
+      });
+    });
+
     test('returns null when no response shape is present', () {
       const source = '''
 export const handler = async (req) => {

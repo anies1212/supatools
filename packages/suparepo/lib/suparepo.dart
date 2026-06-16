@@ -63,7 +63,8 @@ export 'src/edge_function_info.dart'
         EdgeFunctionInfo,
         EdgeFunctionFieldDef,
         EdgeFunctionModelDef,
-        EdgeFunctionResponseField;
+        EdgeFunctionResponseField,
+        EfTableColumn;
 export 'src/ts_type_extractor.dart' show TsTypeExtractor, TsTypeExtractorLoader;
 export 'src/ts_response_type_parser.dart' show TsResponseTypeParser;
 export 'src/supa_query_generator.dart'

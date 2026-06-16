@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.22.0] - 2026-06-17
+
+### Added
+
+- **suparepo**: Infer Edge Function response object types from `.from(table).select(cols)` projections (`edge_functions.infer_response_from_select: true`, default `false`). A `jsonResponse` property that spreads a select result (`{ ...data, extra: ... }`) or is a bare select variable is typed from the introspected table schema — only the selected columns, with their nullability, plus extra literal properties. `.maybeSingle()`/`.single()` → single object, otherwise `List<...>`; aliases and `select("*")` supported. Reshaped (`.map(...)`), relation-embedded, or unresolvable cases fall back to `dynamic`. Strategy 1 (`export interface`) still wins; with the flag off, output is identical to 1.21.0.
+
 ## [suparepo 1.21.0 / supafreeze 2.2.0] - 2026-06-17
 
 ### Added

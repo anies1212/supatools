@@ -134,6 +134,7 @@ class SuparepoConfigLoader extends BaseConfigLoader {
       flattenRequestParams: value['flatten_request_params'] == true,
       inferRequestFromUsage: value['infer_request_from_usage'] == true,
       responseModelsOutput: value['response_models_output']?.toString(),
+      inferResponseFromSelect: value['infer_response_from_select'] == true,
     );
   }
 
@@ -274,6 +275,16 @@ class EdgeFunctionConfig {
   /// generated `<Name>Response` DTO when a response shape was recovered.
   final String? responseModelsOutput;
 
+  /// Whether to infer response object types from `.from(table).select(cols)`
+  /// projections (strategy 3). When a success `jsonResponse({...})` property
+  /// spreads a `.select(...)` result (`{ ...data, extra: ... }`) or is a bare
+  /// select variable, the projected columns are typed from the introspected
+  /// table schema — only the selected columns, with their nullability, plus any
+  /// extra literal properties. Opt-in (default `false`) because it's heuristic;
+  /// reshaped (`.map(...)`), relation-embedded, or otherwise unresolvable cases
+  /// fall back to `dynamic`. Requires a Supabase connection to introspect.
+  final bool inferResponseFromSelect;
+
   const EdgeFunctionConfig({
     this.enabled = false,
     this.output,
@@ -285,6 +296,7 @@ class EdgeFunctionConfig {
     this.flattenRequestParams = false,
     this.inferRequestFromUsage = false,
     this.responseModelsOutput,
+    this.inferResponseFromSelect = false,
   });
 
   /// Checks if a function should be included

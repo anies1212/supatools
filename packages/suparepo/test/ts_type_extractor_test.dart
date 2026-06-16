@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import 'package:suparepo/src/edge_function_info.dart';
 import 'package:suparepo/src/ts_type_extractor.dart';
 import 'package:test/test.dart';
 
@@ -30,6 +31,34 @@ export const handler = async (req) => jsonResponse({ card_date: "x" });
       final body =
           result.responseObject!.firstWhere((f) => f.jsonKey == 'body');
       expect(body.nullable, isTrue);
+    });
+
+    test('threads tableSchemas → select-projection responseObject', () {
+      const source = '''
+export const handler = async (req) => {
+  const { data } = await client.from("daily_cards")
+    .select("card_date, body").maybeSingle();
+  return jsonResponse({ card: { ...data, is_saved: x !== null } });
+};
+''';
+      final result = extractor.extract(
+        indexSource: source,
+        functionName: 'get_daily_card',
+        tableSchemas: const {
+          'daily_cards': [
+            EfTableColumn(name: 'card_date', dartType: 'String'),
+            EfTableColumn(name: 'body', dartType: 'String', nullable: true),
+          ],
+        },
+      );
+
+      final card =
+          result!.responseObject!.firstWhere((f) => f.jsonKey == 'card');
+      expect(card.isObject, isTrue);
+      expect(
+        card.objectFields!.map((f) => f.jsonKey),
+        containsAll(['card_date', 'body', 'is_saved']),
+      );
     });
 
     test('responseObject is null when functionName is omitted', () {

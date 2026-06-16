@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.22.0] - 2026-06-17
+
+### Added
+
+- **Edge Function response inference from `.select()` projections** (`edge_functions.infer_response_from_select: true`, default `false`). Extends the success-response DTO generation: when a `jsonResponse({...})` property spreads a `.from("table").select("cols")` result (`{ ...data, extra: ... }`) or is a bare select variable, the projected columns are typed from the introspected table schema — **only the selected columns**, with their nullability, plus any extra literal properties (typed by the existing name/value heuristic). `.maybeSingle()`/`.single()` yields a single nested object; otherwise `List<...>`. Column aliases (`alias:col`) and `select("*")` are supported.
+
+  This turns the dominant "`.select()` + spread" handler pattern into typed nested DTOs without hand-writing an `export interface`. Heuristic by design, so it's opt-in and degrades safely: reshaped (`.map(...)`), relation-embedded (`bond:bonds(*)`), or otherwise unresolvable projections fall back to `dynamic`. Strategy 1 (`export interface <Name>Response`) still takes precedence, and with the flag off the output is identical to 1.21.0. Requires a Supabase connection to introspect the schema.
+
+  New config key: `edge_functions.infer_response_from_select`.
+
 ## [1.21.0] - 2026-06-17
 
 ### Added

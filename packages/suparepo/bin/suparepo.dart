@@ -451,6 +451,13 @@ Future<int> _generateEdgeFunctionClient(
     '${filtered.map((f) => f.name).join(', ')}',
   );
 
+  // Optionally introspect table schemas for select-projection response
+  // inference (strategy 3). Requires a Supabase connection.
+  Map<String, List<EfTableColumn>>? tableSchemas;
+  if (config.edgeFunctions.inferResponseFromSelect) {
+    tableSchemas = await _fetchEdgeTableSchemas(config);
+  }
+
   // Build modelDefs: YAML definitions + TS auto-detection
   var modelDefs =
       config.edgeFunctions.models ?? <String, EdgeFunctionModelDef>{};
@@ -467,6 +474,7 @@ Future<int> _generateEdgeFunctionClient(
       final autoDef = await loader.extractFromDirectory(
         funcDir,
         inferRequestFromUsage: config.edgeFunctions.inferRequestFromUsage,
+        tableSchemas: tableSchemas,
       );
       final yamlDef = modelDefs[func.name];
 
@@ -557,6 +565,77 @@ Future<int> _generateEdgeFunctionClient(
   }
 
   return generated;
+}
+
+/// Introspects table schemas and converts them into the lightweight
+/// [EfTableColumn] form used by select-projection response inference.
+///
+/// Columns are mapped to self-contained Dart types (no extra imports): JSON
+/// columns and any type that would require an import (e.g. enums) become
+/// `dynamic`. Returns null when no Supabase connection is configured, so
+/// inference is simply skipped rather than aborting Edge Function generation.
+Future<Map<String, List<EfTableColumn>>?> _fetchEdgeTableSchemas(
+  SuparepoConfig config,
+) async {
+  if (!config.isValid) {
+    print(
+      '⚠️  edge_functions.infer_response_from_select needs a Supabase '
+      'connection (url/secret_key). Skipping select-based inference.',
+    );
+    return null;
+  }
+
+  final fetcher = SchemaFetcher(
+    supabaseUrl: config.url!,
+    supabaseKey: config.secretKey!,
+    schema: config.schema,
+  );
+
+  List<TableInfo> tables;
+  try {
+    print('🌐 Fetching schema for response inference...');
+    tables = await fetcher.fetchTables();
+  } on SchemaFetchException catch (e) {
+    print('⚠️  Failed to fetch schema for response inference: $e');
+    return null;
+  }
+
+  return {
+    for (final table in tables)
+      table.name: [
+        for (final col in table.columns)
+          EfTableColumn(
+            name: col.name,
+            dartType: _safeEfDartType(col.dataType),
+            nullable: col.isNullable,
+          ),
+      ],
+  };
+}
+
+/// Maps a PostgreSQL column type to a self-contained Dart type for response
+/// DTOs. Types that would need an import (enums, custom types) and JSON columns
+/// fall back to `dynamic`.
+String _safeEfDartType(String pgType) {
+  if (TypeMapper.isJsonType(pgType)) return 'dynamic';
+  final dartType = TypeMapper.mapType(pgType);
+  const safe = {
+    'String',
+    'int',
+    'double',
+    'num',
+    'bool',
+    'DateTime',
+    'Map<String, dynamic>',
+    'dynamic',
+  };
+  if (safe.contains(dartType)) return dartType;
+  // List<safe> is fine too (e.g. List<String>).
+  final listMatch = RegExp(r'^List<(\w+)>$').firstMatch(dartType);
+  if (listMatch != null && safe.contains(listMatch.group(1))) {
+    return dartType;
+  }
+  return 'dynamic';
 }
 
 /// Generates `supabase_client_provider.dart`.

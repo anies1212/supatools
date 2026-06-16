@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.22.1] - 2026-06-17
+
+### Fixed
+
+- **suparepo**: `flatten_request_params: true` dropped the body parameter for functions that had no recovered request model but were routed to a typed method (because a response shape was recovered) — the method had only `headers`, so body-reading handlers couldn't receive a request. The typed method now retains a raw `Map<String, dynamic>? body` fallback forwarded to `functions.invoke`. Functions with a recovered request are unchanged. Warns when a handler reads a body but no request model was recovered.
+
 ## [suparepo 1.22.0] - 2026-06-17
 
 ### Added

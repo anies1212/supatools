@@ -494,6 +494,21 @@ Future<int> _generateEdgeFunctionClient(
     modelDefs = {...modelDefs, ...merged};
   }
 
+  // Warn when a handler clearly reads a request body but no request model was
+  // recovered. The client still works (a raw `Map<String, dynamic>? body`
+  // fallback is generated), but typing it requires a YAML `models` entry.
+  for (final func in filtered) {
+    if (modelDefs[func.name]?.request != null) continue;
+    final funcDir = p.join(config.edgeFunctions.functionsPath, func.name);
+    if (await _handlerReadsRequestBody(funcDir)) {
+      print(
+        '⚠️  ${func.name}: handler reads a request body but no request model '
+        'was recovered — generated a raw `Map<String, dynamic>? body` '
+        'fallback. Add `edge_functions.models.${func.name}.request` to type it.',
+      );
+    }
+  }
+
   final outputPath = config.edgeFunctions.output ??
       p.join(config.output, 'edge_function_client.dart');
   final edgeOutputDir = p.dirname(outputPath);
@@ -565,6 +580,19 @@ Future<int> _generateEdgeFunctionClient(
   }
 
   return generated;
+}
+
+/// Returns true when the Edge Function's `index.ts`/`handler.ts` reads a
+/// request body (`req.json()`, `req.text()`, etc.) — a heuristic used only to
+/// emit a "consider adding a request model" warning.
+Future<bool> _handlerReadsRequestBody(String funcDir) async {
+  final bodyRead = RegExp(r'req\.(json|text|formData|arrayBuffer)\s*\(');
+  for (final name in ['index.ts', 'handler.ts']) {
+    final file = File(p.join(funcDir, name));
+    if (!await file.exists()) continue;
+    if (bodyRead.hasMatch(await file.readAsString())) return true;
+  }
+  return false;
 }
 
 /// Introspects table schemas and converts them into the lightweight

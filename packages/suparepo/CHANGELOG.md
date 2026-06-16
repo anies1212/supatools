@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.22.1] - 2026-06-17
+
+### Fixed
+
+- **`flatten_request_params` no longer drops the body for functions with no recovered request model.** When `flatten_request_params: true` and a function had no YAML `models.<fn>.request` and no usage-inferred request (but still routed to a typed method because a response shape was recovered), the generated client method had *no body parameter at all* — only `headers` — so callers couldn't send a request body and body-reading handlers broke. The typed method now keeps a raw `Map<String, dynamic>? body` fallback (forwarded to `functions.invoke(..., body: body)`) whenever the request couldn't be expanded into named parameters. Functions with a recovered request are unchanged. Also emits a warning when a handler clearly reads a request body (`req.json()` etc.) but no request model was recovered, suggesting a `models` entry.
+
 ## [1.22.0] - 2026-06-17
 
 ### Added

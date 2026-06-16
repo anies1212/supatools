@@ -169,6 +169,12 @@ class EdgeFunctionGenerator {
       buffer.writeln(
         '    required ${baseName}Request request,',
       );
+    } else {
+      // No request model recovered (no YAML `models` entry and usage-based
+      // inference found nothing). Flatten can't expand unknown fields, so keep
+      // a raw body fallback — otherwise the method would have no way to send a
+      // request body at all.
+      buffer.writeln('    Map<String, dynamic>? body,');
     }
     buffer.writeln('    Map<String, String>? headers,');
     buffer.writeln('  }) async {');
@@ -181,6 +187,8 @@ class EdgeFunctionGenerator {
       _writeInlineBody(buffer, modelDef.request!);
     } else if (hasRequest) {
       buffer.writeln('      body: request.toJson(),');
+    } else {
+      buffer.writeln('      body: body,');
     }
     buffer.writeln('      headers: headers,');
     buffer.writeln('    );');

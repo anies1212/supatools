@@ -167,6 +167,51 @@ void main() {
       expect(output, contains('GetDailyCardResponse.fromJson(json)'));
     });
 
+    test('no request recovered + flatten → keeps raw body fallback', () {
+      final functions = [EdgeFunctionInfo(name: 'update_bond')];
+      final modelDefs = {
+        'update_bond': const EdgeFunctionModelDef(
+          responseObject: [
+            EdgeFunctionResponseField(jsonKey: 'ok', dartScalarType: 'bool'),
+          ],
+        ),
+      };
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+        modelDefs: modelDefs,
+        flattenRequestParams: true,
+      );
+
+      // The typed method must still accept and forward a raw body.
+      expect(output, contains('Future<UpdateBondResponse> updateBond'));
+      expect(output, contains('Map<String, dynamic>? body,'));
+      expect(output, contains('body: body,'));
+    });
+
+    test('no request recovered without response → body fallback retained', () {
+      final functions = [EdgeFunctionInfo(name: 'record_daily_view')];
+      // Only an error model (no request, no response) still routes to the typed
+      // method via the dispatch in the client; but here we cover the response
+      // path explicitly with a flat (heuristic) response and no request.
+      final modelDefs = {
+        'record_daily_view': const EdgeFunctionModelDef(
+          response: [
+            EdgeFunctionFieldDef(name: 'ok', dataType: 'bool'),
+          ],
+        ),
+      };
+
+      final output = generator.generateEdgeFunctionClient(
+        functions,
+        modelDefs: modelDefs,
+        flattenRequestParams: true,
+      );
+
+      expect(output, contains('Map<String, dynamic>? body,'));
+      expect(output, contains('body: body,'));
+    });
+
     test('generates with type definitions (request only)', () {
       final functions = [
         EdgeFunctionInfo(name: 'notify'),

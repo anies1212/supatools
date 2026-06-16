@@ -20,6 +20,7 @@ class TsTypeExtractor {
     bool inferRequestFromUsage = false,
     String? functionName,
     Map<String, List<EfTableColumn>>? tableSchemas,
+    String? importedSources,
   }) {
     final source = _removeComments(
       handlerSource != null ? '$indexSource\n$handlerSource' : indexSource,
@@ -42,6 +43,7 @@ class TsTypeExtractor {
             indexSource: indexSource,
             handlerSource: handlerSource,
             tableSchemas: tableSchemas,
+            importedSources: importedSources,
           );
 
     if (request == null &&
@@ -456,12 +458,50 @@ class TsTypeExtractorLoader {
       handlerSource = await handlerFile.readAsString();
     }
 
+    // Resolve the handler's relative imports (one level) so response inference
+    // can recover the return types of imported helper functions.
+    final importedSources = await _readRelativeImports(
+      functionDirPath,
+      [indexSource, if (handlerSource != null) handlerSource],
+    );
+
     return _extractor.extract(
       indexSource: indexSource,
       handlerSource: handlerSource,
       inferRequestFromUsage: inferRequestFromUsage,
       functionName: p.basename(functionDirPath),
       tableSchemas: tableSchemas,
+      importedSources: importedSources,
     );
+  }
+
+  /// Reads the files referenced by relative `import ... from "./x.ts"` /
+  /// `"../x.ts"` statements in [sources], resolved against [functionDirPath].
+  /// Returns their concatenated content (one level deep), or null if none.
+  Future<String?> _readRelativeImports(
+    String functionDirPath,
+    List<String> sources,
+  ) async {
+    final importPath = RegExp('''from\\s+['"](\\.[^'"]+)['"]''');
+    final paths = <String>{};
+    for (final src in sources) {
+      for (final m in importPath.allMatches(src)) {
+        paths.add(m.group(1)!);
+      }
+    }
+    if (paths.isEmpty) return null;
+
+    final buffer = StringBuffer();
+    for (final rel in paths) {
+      final resolved = p.normalize(p.join(functionDirPath, rel));
+      for (final candidate in [resolved, '$resolved.ts']) {
+        final file = File(candidate);
+        if (await file.exists()) {
+          buffer.writeln(await file.readAsString());
+          break;
+        }
+      }
+    }
+    return buffer.isEmpty ? null : buffer.toString();
   }
 }

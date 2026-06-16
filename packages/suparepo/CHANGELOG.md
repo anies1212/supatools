@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0] - 2026-06-17
+
+### Added
+
+- **Response DTO inference now unions all success returns.** Handlers that return multiple success `jsonResponse({...})` calls (e.g. an early `{ already: true }` plus a main `{ completed: true, allDone }`) previously only had their *first* return analyzed, dropping keys that appeared only in later returns. The inference now scans every success return and takes the **union** of their property sets — a key present in only some returns becomes optional (nullable). Same-typed occurrences keep their type (nested objects merge recursively); conflicting types fall back to `dynamic`. Single-return and `.select()`-based functions are unchanged.
+- **Imported helper return types are resolved across relative imports.** A `jsonResponse` property bound to a local `const x = helper(...)` now resolves to `helper`'s declared return type even when `helper` is imported from a relative module (e.g. `computeAllDone(): boolean` from `../_shared/daily_todos.ts`), so such fields are typed (`bool`) instead of `dynamic`. The handler's one-level relative imports are read for function/arrow return types only.
+
 ## [1.22.3] - 2026-06-17
 
 ### Fixed

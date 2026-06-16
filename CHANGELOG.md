@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.23.0] - 2026-06-17
+
+### Added
+
+- **suparepo**: Response DTO inference now unions all success `jsonResponse({...})` returns (keys present in only some returns become optional), instead of analyzing only the first return. Conflicting types across returns fall back to `dynamic`; single-return / `.select()`-based functions are unchanged.
+- **suparepo**: Imported helper return types are resolved across the handler's one-level relative imports, so a field bound to `const x = computeAllDone(...)` (imported from `../_shared/…`) is typed (e.g. `bool`) instead of `dynamic`.
+
 ## [suparepo 1.22.3] - 2026-06-17
 
 ### Fixed

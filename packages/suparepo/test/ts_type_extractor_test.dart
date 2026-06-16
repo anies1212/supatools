@@ -61,6 +61,42 @@ export const handler = async (req) => {
       );
     });
 
+    test('resolves imported helper return types across relative imports',
+        () async {
+      final tmp = Directory.systemTemp.createTempSync('suparepo_ef_');
+      addTearDown(() => tmp.deleteSync(recursive: true));
+      final funcDir = Directory(p.join(tmp.path, 'functions', 'complete_daily_todo'))
+        ..createSync(recursive: true);
+      final sharedDir = Directory(p.join(tmp.path, 'functions', '_shared'))
+        ..createSync(recursive: true);
+
+      File(p.join(sharedDir.path, 'daily_todos.ts')).writeAsStringSync('''
+export function computeAllDone(
+  todos: ReadonlyArray<{ completed_at: string | null }>,
+): boolean {
+  return todos.length > 0;
+}
+''');
+      File(p.join(funcDir.path, 'index.ts')).writeAsStringSync('''
+import { computeAllDone } from "../_shared/daily_todos.ts";
+export const handler = async (req) => {
+  if (already) return jsonResponse({ already: true });
+  const allDone = computeAllDone(allTodos ?? []);
+  return jsonResponse({ completed: true, allDone });
+};
+''');
+
+      final def = await const TsTypeExtractorLoader()
+          .extractFromDirectory(funcDir.path);
+      final ro = def!.responseObject!;
+
+      expect(ro.map((f) => f.jsonKey), ['already', 'completed', 'allDone']);
+      // allDone resolves to bool via the imported computeAllDone(): boolean.
+      final allDone = ro.firstWhere((f) => f.jsonKey == 'allDone');
+      expect(allDone.dartScalarType, 'bool');
+      expect(allDone.nullable, isTrue, reason: 'only in one of two returns');
+    });
+
     test('responseObject is null when functionName is omitted', () {
       const source = '''
 export interface FooResponse { ok: boolean; }

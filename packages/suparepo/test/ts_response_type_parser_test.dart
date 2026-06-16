@@ -130,6 +130,66 @@ export const handler = async (req) => {
         expect(field(result, 'isEntitled').dartScalarType, 'bool');
       });
 
+      test('unions multiple success returns; partial keys are optional', () {
+        // Mirrors complete_daily_todo/handler.ts: two success returns.
+        const source = '''
+export function computeAllDone(todos): boolean { return true; }
+export const handler = async (req) => {
+  if (already) return jsonResponse({ already: true });
+  const allDone = computeAllDone(allTodos ?? []);
+  return jsonResponse({ completed: true, allDone });
+};
+''';
+        final result = parser.parse(
+          functionName: 'complete_daily_todo',
+          indexSource: source,
+        );
+
+        expect(result, isNotNull);
+        expect(
+          result!.map((f) => f.jsonKey),
+          ['already', 'completed', 'allDone'],
+        );
+        // Each appears in only one of two returns → all optional.
+        for (final f in result) {
+          expect(f.nullable, isTrue, reason: '${f.jsonKey} should be optional');
+          expect(f.dartScalarType, 'bool', reason: f.jsonKey);
+        }
+      });
+
+      test('key present in all returns stays required', () {
+        const source = '''
+export const handler = async (req) => {
+  if (x) return jsonResponse({ ok: true, extra: true });
+  return jsonResponse({ ok: true });
+};
+''';
+        final result = parser.parse(
+          functionName: 'do_thing',
+          indexSource: source,
+        );
+        final ok = field(result!, 'ok');
+        expect(ok.nullable, isFalse, reason: 'present in both returns');
+        expect(field(result, 'extra').nullable, isTrue);
+      });
+
+      test('conflicting types across returns → dynamic', () {
+        const source = '''
+export const handler = async (req) => {
+  if (x) return jsonResponse({ value: true });
+  return jsonResponse({ value: someText });
+};
+''';
+        final result = parser.parse(
+          functionName: 'do_thing',
+          indexSource: source,
+        );
+        final value = field(result!, 'value');
+        expect(value.dartScalarType, 'dynamic');
+        // Present in both returns → stays required despite the type conflict.
+        expect(value.nullable, isFalse);
+      });
+
       test('skips error-only JSON.stringify blocks', () {
         const source = '''
 export const handler = async (req) => {

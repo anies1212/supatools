@@ -24,15 +24,23 @@ class TsResponseTypeParser {
   /// provided (keyed by table name), a `jsonResponse` property that spreads a
   /// `<client>.from("t").select("cols")` result is typed from the table's
   /// columns. When null/empty, strategy 3 is off (default, opt-in upstream).
+  /// [importedSources] is the concatenated content of the handler's relative
+  /// imports (resolved by the loader). It's used only to resolve the return
+  /// types of imported helper functions referenced in `jsonResponse({...})`
+  /// (e.g. `const allDone = computeAllDone(...)`), never to scan for response
+  /// shapes.
   List<EdgeFunctionResponseField>? parse({
     required String functionName,
     required String indexSource,
     String? handlerSource,
     Map<String, List<EfTableColumn>>? tableSchemas,
+    String? importedSources,
   }) {
     final source = _stripComments(
       handlerSource != null ? '$indexSource\n$handlerSource' : indexSource,
     );
+    final imported =
+        importedSources == null ? null : _stripComments(importedSources);
 
     final interfaces = _parseInterfaces(source);
 
@@ -44,8 +52,8 @@ class TsResponseTypeParser {
       if (fields != null && fields.isNotEmpty) return fields;
     }
 
-    // Strategies 2 & 3: infer from the success `jsonResponse({...})` call.
-    return _inferFromSuccessResponse(source, interfaces, tableSchemas);
+    // Strategies 2 & 3: infer from the success `jsonResponse({...})` call(s).
+    return _inferFromSuccessResponse(source, interfaces, tableSchemas, imported);
   }
 
   // --- Interface parsing ---
@@ -203,14 +211,42 @@ class TsResponseTypeParser {
     String source,
     Map<String, String> interfaces,
     Map<String, List<EfTableColumn>>? tableSchemas,
+    String? importedSources,
   ) {
-    final objectLiteral = _findSuccessObjectLiteral(source);
-    if (objectLiteral == null) return null;
+    final literals = _findSuccessObjectLiterals(source);
+    if (literals.isEmpty) return null;
 
-    final symbols = _parseSymbolTypes(source);
+    final symbols = _parseSymbolTypes(source, importedSources);
     final selectVars = (tableSchemas != null && tableSchemas.isNotEmpty)
         ? _parseSelectVars(source)
         : const <String, _SelectInfo>{};
+
+    // Parse every success return, then take the union of their property sets:
+    // a key present in only some returns becomes optional (nullable).
+    final perReturn = [
+      for (final literal in literals)
+        _parseSuccessLiteral(
+          literal,
+          symbols,
+          interfaces,
+          selectVars,
+          tableSchemas,
+        ),
+    ];
+
+    final merged =
+        perReturn.length == 1 ? perReturn.first : _unionFields(perReturn);
+    return merged.isEmpty ? null : merged;
+  }
+
+  /// Parses a single success object literal into fields (possibly empty).
+  List<EdgeFunctionResponseField> _parseSuccessLiteral(
+    String objectLiteral,
+    Map<String, String> symbols,
+    Map<String, String> interfaces,
+    Map<String, _SelectInfo> selectVars,
+    Map<String, List<EfTableColumn>>? tableSchemas,
+  ) {
     final fields = <EdgeFunctionResponseField>[];
 
     for (final member in _splitMembers(objectLiteral)) {
@@ -251,43 +287,142 @@ class TsResponseTypeParser {
       ));
     }
 
-    return fields.isEmpty ? null : fields;
+    return fields;
   }
 
-  /// Finds the object literal of the first success (`jsonResponse` /
-  /// non-error `JSON.stringify`) response in [source].
-  String? _findSuccessObjectLiteral(String source) {
-    // Prefer an explicit `jsonResponse({ ... })` helper call.
+  /// Unions the field sets of multiple success returns. A key missing from any
+  /// return (or nullable in any) becomes nullable. Same-typed occurrences keep
+  /// their type (objects merge their nested fields recursively); conflicting
+  /// types fall back to `dynamic`.
+  List<EdgeFunctionResponseField> _unionFields(
+    List<List<EdgeFunctionResponseField>> returns,
+  ) {
+    final total = returns.length;
+    final order = <String>[];
+    final byKey = <String, List<EdgeFunctionResponseField>>{};
+    for (final fields in returns) {
+      for (final f in fields) {
+        if (!byKey.containsKey(f.jsonKey)) order.add(f.jsonKey);
+        byKey.putIfAbsent(f.jsonKey, () => []).add(f);
+      }
+    }
+
+    return [
+      for (final key in order)
+        _mergeOccurrences(
+          key,
+          byKey[key]!,
+          byKey[key]!.any((f) => f.nullable) || byKey[key]!.length < total,
+        ),
+    ];
+  }
+
+  EdgeFunctionResponseField _mergeOccurrences(
+    String key,
+    List<EdgeFunctionResponseField> occ,
+    bool nullable,
+  ) {
+    final isList = occ.first.isList;
+    final sameList = occ.every((f) => f.isList == isList);
+
+    if (sameList && occ.every((f) => f.isObject)) {
+      final nested = _unionFields([for (final f in occ) f.objectFields!]);
+      if (nested.isNotEmpty) {
+        return EdgeFunctionResponseField(
+          jsonKey: key,
+          nullable: nullable,
+          isList: isList,
+          objectFields: nested,
+        );
+      }
+    } else if (sameList && occ.every((f) => !f.isObject)) {
+      final types = {for (final f in occ) f.dartScalarType};
+      if (types.length == 1 && types.first != 'dynamic') {
+        return EdgeFunctionResponseField(
+          jsonKey: key,
+          nullable: nullable,
+          isList: isList,
+          dartScalarType: types.first,
+        );
+      }
+    }
+
+    // Conflicting or unresolvable across returns → dynamic.
+    return EdgeFunctionResponseField(
+      jsonKey: key,
+      nullable: nullable,
+      dartScalarType: 'dynamic',
+    );
+  }
+
+  /// Finds the object literals of all success (`jsonResponse` / non-error
+  /// `JSON.stringify`) responses in [source]. Empty `{}` literals are included
+  /// so they count as a return path when unioning.
+  List<String> _findSuccessObjectLiterals(String source) {
+    final results = <String>[];
+
     final jsonResponse = RegExp(r'jsonResponse\s*\(\s*\{');
     for (final m in jsonResponse.allMatches(source)) {
       final body = _extractBraces(source, m.end - 1);
-      if (body != null && body.trim().isNotEmpty) return body;
+      if (body != null) results.add(body);
     }
+    if (results.isNotEmpty) return results;
 
-    // Otherwise, a `JSON.stringify({ ... })` not inside an error response.
+    // Otherwise, `JSON.stringify({ ... })` blocks not inside an error response.
     final stringify = RegExp(r'JSON\.stringify\s*\(\s*\{');
     for (final m in stringify.allMatches(source)) {
       final body = _extractBraces(source, m.end - 1);
       if (body == null) continue;
       if (RegExp('error').hasMatch(body)) continue;
-      if (body.trim().isNotEmpty) return body;
+      results.add(body);
     }
-    return null;
+    return results;
   }
 
-  /// Builds a map of identifier → declared/return TypeScript type from
-  /// `function f(...): T` and `const x: T =` declarations.
-  Map<String, String> _parseSymbolTypes(String source) {
-    final result = <String, String>{};
+  /// Builds a map of identifier → declared/return TypeScript type.
+  ///
+  /// Function return types are collected from both [source] and
+  /// [importedSources] (so imported helpers like `computeAllDone(): boolean`
+  /// resolve). Variable types are collected from [source] only: explicit
+  /// `const x: T =` annotations, and `const x = fn(...)` bound to a known
+  /// function (its return type).
+  Map<String, String> _parseSymbolTypes(String source, [String? importedSources]) {
+    final functions = <String, String>{};
 
-    final fn = RegExp(r'function\s+(\w+)\s*\([^)]*\)\s*:\s*([^\{]+?)\s*\{');
-    for (final m in fn.allMatches(source)) {
-      result[m.group(1)!] = m.group(2)!.trim();
+    void collectFunctions(String src) {
+      final fn = RegExp(r'function\s+(\w+)\s*\([^)]*\)\s*:\s*([^{]+?)\s*\{');
+      for (final m in fn.allMatches(src)) {
+        functions.putIfAbsent(m.group(1)!, () => m.group(2)!.trim());
+      }
+      // Arrow with return type: `const f = (...): T =>`.
+      final arrow = RegExp(
+        r'(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*:\s*([^=]+?)\s*=>',
+      );
+      for (final m in arrow.allMatches(src)) {
+        functions.putIfAbsent(m.group(1)!, () => m.group(2)!.trim());
+      }
     }
 
+    collectFunctions(source);
+    if (importedSources != null) collectFunctions(importedSources);
+
+    final result = <String, String>{...functions};
+
+    // Explicitly typed const: `const x: T = ...`.
     final constTyped = RegExp(r'const\s+(\w+)\s*:\s*([^=]+?)\s*=');
     for (final m in constTyped.allMatches(source)) {
       result.putIfAbsent(m.group(1)!, () => m.group(2)!.trim());
+    }
+
+    // Untyped const bound to a known function call: `const x = fn(...)`.
+    final constCall = RegExp(
+      r'(?:const|let|var)\s+(\w+)\s*=\s*(?:await\s+)?(\w+)\s*\(',
+    );
+    for (final m in constCall.allMatches(source)) {
+      final fnName = m.group(2)!;
+      if (functions.containsKey(fnName)) {
+        result.putIfAbsent(m.group(1)!, () => functions[fnName]!);
+      }
     }
 
     return result;

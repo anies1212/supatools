@@ -261,6 +261,31 @@ export const handler = async (req) => {
         expect(field(result!, 'wish').objectFields, hasLength(2));
       });
 
+      test('no-arg .select() (insert+select) → all columns, typed', () {
+        // Mirrors create_wish/handler.ts: `.insert({...}).select().single()`.
+        const source = '''
+export const handler = async (req) => {
+  const { data, error } = await admin
+    .from("wishes")
+    .insert({ user_id: auth.userId, title: t })
+    .select()
+    .single();
+  return jsonResponse({ wish: data, windowDates: compute(x) });
+};
+''';
+        final result = parser.parse(
+          functionName: 'create_wish',
+          indexSource: source,
+          tableSchemas: schemas,
+        );
+
+        final wish = field(result!, 'wish');
+        expect(wish.isObject, isTrue, reason: 'no-arg select → all columns');
+        expect(wish.isList, isFalse);
+        expect(wish.objectFields, hasLength(2));
+        expect(field(wish.objectFields!, 'id').dartScalarType, 'String');
+      });
+
       test('relation embed → safe dynamic fallback', () {
         const source = '''
 export const handler = async (req) => {

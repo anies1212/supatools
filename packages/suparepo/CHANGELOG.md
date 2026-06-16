@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.22.3] - 2026-06-17
+
+### Fixed
+
+- **Select-projection inference now handles no-argument `.select()`** (e.g. `.insert({...}).select().single()`). PostgREST treats `.select()` with no arguments as "all columns", but `infer_response_from_select` only recognized `.select("cols")` with an explicit column string, so a `jsonResponse({ wish: data })` backed by `.select()` fell back to `dynamic` — forcing callers back to `response.toJson()['wish']` map access. A no-arg `.select()` is now treated as `*`, so the property becomes a typed nested DTO (e.g. `response.wish.body`) typed from the table schema.
+
 ## [1.22.2] - 2026-06-17
 
 ### Fixed

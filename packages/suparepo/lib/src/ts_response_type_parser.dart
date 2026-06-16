@@ -518,10 +518,13 @@ class TsResponseTypeParser {
       final selectMatch = RegExp(
         '''\\.select\\(\\s*['"`]([\\s\\S]*?)['"`]\\s*,?\\s*\\)''',
       ).firstMatch(rhs);
-      if (fromMatch == null || selectMatch == null) continue;
+      // `.select()` with no arguments selects all columns (PostgREST default),
+      // e.g. `.insert({...}).select().single()`.
+      final emptySelect = RegExp(r'\.select\(\s*\)').hasMatch(rhs);
+      if (fromMatch == null || (selectMatch == null && !emptySelect)) continue;
 
       final table = fromMatch.group(1)!;
-      final select = selectMatch.group(1)!;
+      final select = selectMatch?.group(1) ?? '*';
       final isSingle =
           rhs.contains('.maybeSingle(') || rhs.contains('.single(');
 

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.22.3] - 2026-06-17
+
+### Fixed
+
+- **suparepo**: `infer_response_from_select` now recognizes no-argument `.select()` (e.g. `.insert({...}).select().single()`) as "all columns", so `jsonResponse({ wish: data })` becomes a typed nested DTO instead of `dynamic`. Previously only `.select("cols")` with an explicit string was handled, forcing callers back to `response.toJson()['key']` map access.
+
 ## [suparepo 1.22.2] - 2026-06-17
 
 ### Fixed

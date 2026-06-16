@@ -39,6 +39,10 @@ void main() {
         ),
       );
       expect(content, contains(r'_$GetDailyCardResponseFromJson(json);'));
+      // @JsonKey on @freezed factory params triggers invalid_annotation_target
+      // (a warning, not a lint), so it must be self-ignored per file — callers
+      // shouldn't need a package-wide analyzer override.
+      expect(content, contains('invalid_annotation_target'));
     });
 
     test('generates nested classes for nested objects', () {

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.22.2] - 2026-06-17
+
+### Fixed
+
+- **suparepo**: Generated Edge Function response DTOs now self-ignore `invalid_annotation_target` in their per-file header (it's a warning, not a lint, so `type=lint` didn't cover it). Consuming packages no longer need a package-wide analyzer override for the `@JsonKey`-on-`@freezed`-factory-param warning.
+
 ## [suparepo 1.22.1] - 2026-06-17
 
 ### Fixed

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.22.2] - 2026-06-17
+
+### Fixed
+
+- **Generated Edge Function response DTOs now self-ignore `invalid_annotation_target`.** The DTOs put `@JsonKey` on `@freezed` factory parameters, which raises the `invalid_annotation_target` *warning* (not a lint, so it wasn't covered by the existing `// ignore_for_file: type=lint`). The per-file ignore header now lists it explicitly — matching supafreeze's generated models — so consuming packages no longer need a package-wide analyzer override.
+
 ## [1.22.1] - 2026-06-17
 
 ### Fixed

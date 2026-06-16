@@ -43,7 +43,8 @@ class EdgeFunctionResponseGenerator {
     buffer.writeln('// ignore_for_file: type=lint');
     buffer.writeln(
       '// ignore_for_file: public_member_api_docs, '
-      'sort_constructors_first, lines_longer_than_80_chars',
+      'sort_constructors_first, lines_longer_than_80_chars, '
+      'invalid_annotation_target',
     );
     buffer.writeln();
 

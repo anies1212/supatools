@@ -441,6 +441,17 @@ class TsResponseTypeParser {
       }
     }
 
+    // Untyped const bound to a comparison/logical/not expression:
+    // `const allowed = a === b || c`. Resolves to `boolean` so a shorthand
+    // `{ allowed }` becomes `bool`. Iterated in source order so a boolean const
+    // referencing earlier boolean consts (`const c = a || b`) resolves too.
+    final constExpr = RegExp(r'(?:const|let|var)\s+(\w+)\s*=\s*([^;\n]+)');
+    for (final m in constExpr.allMatches(source)) {
+      final name = m.group(1)!;
+      if (result.containsKey(name)) continue;
+      if (_isBooleanExpr(m.group(2)!.trim(), result)) result[name] = 'boolean';
+    }
+
     return result;
   }
 
@@ -470,6 +481,11 @@ class TsResponseTypeParser {
 
     // Boolean literal.
     if (expr == 'true' || expr == 'false') return _scalar('bool', false);
+
+    // Comparison / logical / not expression → boolean. Keeps a field like
+    // `allowed: country === null || country === X` typed as `bool` instead of
+    // degrading to `dynamic` (so it unions cleanly with a literal `true`).
+    if (_isBooleanExpr(expr, symbols)) return _scalar('bool', false);
 
     // Strategy 3: type from a `.from(table).select(cols)` projection.
     if (tableSchemas != null && tableSchemas.isNotEmpty) {
@@ -717,6 +733,153 @@ class TsResponseTypeParser {
     }
     if (_identifier.hasMatch(target)) return target;
     return null;
+  }
+
+  // --- Boolean-expression inference ---
+
+  /// Whether [expr] is a comparison, logical (`&&`/`||`), or `!` expression
+  /// that resolves to `boolean`. Comparisons (`===`, `!==`, `==`, `!=`, `<`,
+  /// `<=`, `>`, `>=`) and a prefix `!` are always boolean. A logical `&&`/`||`
+  /// is boolean only when *both* operands resolve to boolean (recursively, via
+  /// a boolean literal, or a [symbols] entry typed `boolean`). Anything else —
+  /// including ternaries and arithmetic — returns false, keeping the safe
+  /// `dynamic` fallback.
+  bool _isBooleanExpr(String expr, Map<String, String> symbols) {
+    final e = _stripOuterParens(expr.trim());
+    if (e.isEmpty) return false;
+
+    // A top-level ternary's type is its branches, not boolean.
+    if (_hasTopLevelTernary(e)) return false;
+
+    // Logical `&&`/`||` (lowest precedence): all operands must be boolean.
+    final operands = _splitTopLevelLogical(e);
+    if (operands != null) {
+      return operands.every((o) => _isBooleanExpr(o, symbols));
+    }
+
+    // Prefix logical NOT (but not the `!=` / `!==` operators).
+    if (e.startsWith('!') && !e.startsWith('!=')) return true;
+
+    // Comparison operator at the top level.
+    if (_hasTopLevelComparison(e)) return true;
+
+    // Boolean literal operand.
+    if (e == 'true' || e == 'false') return true;
+
+    // Bare identifier whose symbol type resolves to `bool`.
+    if (_identifier.hasMatch(e)) {
+      final type = symbols[e];
+      if (type == null) return false;
+      final resolved = _resolveType(type, const {}, {});
+      return resolved != null &&
+          !resolved.isList &&
+          resolved.dartScalarType == 'bool';
+    }
+
+    return false;
+  }
+
+  /// Removes balanced parentheses that wrap the entire expression.
+  String _stripOuterParens(String expr) {
+    var s = expr.trim();
+    while (s.length >= 2 && s.startsWith('(') && s.endsWith(')')) {
+      var depth = 0;
+      var wraps = true;
+      for (var i = 0; i < s.length; i++) {
+        final c = s[i];
+        if (c == '(') {
+          depth++;
+        } else if (c == ')') {
+          depth--;
+          if (depth == 0 && i != s.length - 1) {
+            wraps = false;
+            break;
+          }
+        }
+      }
+      if (!wraps) break;
+      s = s.substring(1, s.length - 1).trim();
+    }
+    return s;
+  }
+
+  /// Splits [expr] on top-level `&&`/`||`. Returns null when there is none.
+  List<String>? _splitTopLevelLogical(String expr) {
+    final parts = <String>[];
+    final buffer = StringBuffer();
+    var depth = 0;
+    var found = false;
+    for (var i = 0; i < expr.length; i++) {
+      final c = expr[i];
+      if (c == '(' || c == '[' || c == '{') depth++;
+      if (c == ')' || c == ']' || c == '}') depth--;
+      if (depth == 0 && i + 1 < expr.length) {
+        final two = expr.substring(i, i + 2);
+        if (two == '&&' || two == '||') {
+          parts.add(buffer.toString());
+          buffer.clear();
+          i++;
+          found = true;
+          continue;
+        }
+      }
+      buffer.write(c);
+    }
+    if (!found) return null;
+    parts.add(buffer.toString());
+    return parts;
+  }
+
+  /// Whether [expr] has a comparison operator at brace/bracket/paren depth 0.
+  bool _hasTopLevelComparison(String expr) {
+    const ops = ['===', '!==', '==', '!=', '<=', '>=', '<', '>'];
+    var depth = 0;
+    for (var i = 0; i < expr.length; i++) {
+      final c = expr[i];
+      if (c == '(' || c == '[' || c == '{') {
+        depth++;
+        continue;
+      }
+      if (c == ')' || c == ']' || c == '}') {
+        depth--;
+        continue;
+      }
+      if (depth != 0) continue;
+      // Skip the arrow `=>` so it isn't read as `>`.
+      if (c == '=' && i + 1 < expr.length && expr[i + 1] == '>') {
+        i++;
+        continue;
+      }
+      for (final op in ops) {
+        if (i + op.length <= expr.length &&
+            expr.substring(i, i + op.length) == op) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Whether [expr] has a top-level ternary `?` (ignoring `?.` and `??`).
+  bool _hasTopLevelTernary(String expr) {
+    var depth = 0;
+    for (var i = 0; i < expr.length; i++) {
+      final c = expr[i];
+      if (c == '(' || c == '[' || c == '{') {
+        depth++;
+        continue;
+      }
+      if (c == ')' || c == ']' || c == '}') {
+        depth--;
+        continue;
+      }
+      if (depth != 0 || c != '?') continue;
+      final next = i + 1 < expr.length ? expr[i + 1] : '';
+      final prev = i > 0 ? expr[i - 1] : '';
+      if (next == '.' || next == '?' || prev == '?') continue;
+      return true;
+    }
+    return false;
   }
 
   // --- Low-level helpers ---

@@ -238,6 +238,65 @@ export function computeAllDone(rows: TodoRow[]): boolean {
         expect(field(result!, 'all_done').dartScalarType, 'bool');
       });
 
+      test('comparison/logical const → bool, unions with literal true', () {
+        // Mirrors get_access_status/handler.ts: a boolean expression bound to a
+        // const, unioned across returns with a literal `true`.
+        const source = '''
+export const handler = async (req) => {
+  if (early) return jsonResponse({ allowed: true, country: null });
+  const allowed = country === null || country === ALLOWED_COUNTRY;
+  return jsonResponse({ allowed, country });
+};
+''';
+        final result = parser.parse(
+          functionName: 'get_access_status',
+          indexSource: source,
+        );
+
+        expect(result, isNotNull);
+        // `allowed` (bool expr) ∪ literal `true` (bool) must converge to bool.
+        expect(field(result!, 'allowed').dartScalarType, 'bool');
+      });
+
+      test('inline comparison/not value exprs and logical of bool consts', () {
+        const source = '''
+export const handler = async (req) => {
+  const ready = a === b;
+  const blocked = !ready;
+  const both = ready && blocked;
+  return jsonResponse({
+    eq: a === b,
+    neq: a !== b,
+    not: !done,
+    combined: both,
+    gt: count > 0,
+  });
+};
+''';
+        final result = parser.parse(
+          functionName: 'check_state',
+          indexSource: source,
+        );
+
+        expect(result, isNotNull);
+        for (final key in ['eq', 'neq', 'not', 'combined', 'gt']) {
+          expect(field(result!, key).dartScalarType, 'bool', reason: key);
+        }
+      });
+
+      test('ternary value is not mistaken for bool (stays dynamic)', () {
+        const source = '''
+export const handler = async (req) => {
+  return jsonResponse({ level: count > 0 ? 1 : 2 });
+};
+''';
+        final result = parser.parse(
+          functionName: 'grade',
+          indexSource: source,
+        );
+        expect(field(result!, 'level').dartScalarType, 'dynamic');
+      });
+
       test('key present in all returns stays required', () {
         const source = '''
 export const handler = async (req) => {

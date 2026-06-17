@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.23.2] - 2026-06-17
+
+### Fixed
+
+- **Response DTO inference now types comparison/logical/`!` expressions as `boolean`.** A `jsonResponse` field whose value is (or whose `const` is bound to) a comparison (`===`, `!==`, `==`, `!=`, `<`, `<=`, `>`, `>=`), a logical `&&`/`||`, or a prefix `!` previously fell back to `dynamic` — so when unioned across returns with a literal `true`/`false`, the field degraded to `dynamic` instead of `bool` (e.g. `get_access_status.allowed`). Such expressions now resolve to `bool`: comparisons and `!` are always boolean, and `&&`/`||` is boolean when both operands resolve to boolean (recursively, via a boolean literal, or a `boolean`-typed symbol). Ternaries, arithmetic, and other unresolvable expressions still fall back to `dynamic`. `Promise<T>` unwrap, sync helpers, `.select()` inference, request inference, and error generation are unchanged.
+
 ## [1.23.1] - 2026-06-17
 
 ### Fixed

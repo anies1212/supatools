@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.23.1] - 2026-06-17
+
+### Fixed
+
+- **Cross-file return-type resolution now unwraps `Promise<T>` from awaited async helpers.** The 1.23.0 cross-file resolution read an imported helper's declared return type, but an `async` helper's type is `Promise<T>` — which fell through to `dynamic` instead of `T`. Now a resolved `Promise<T>` is unwrapped to `T` (e.g. `await isEntitledUser(): Promise<boolean>` → `bool`, `Promise<string>` → `String`, `Promise<Foo>` → the `Foo` DTO; arrays/nested types reuse the existing mapping). This also resolves a field whose value is written as `await helper(...)` directly. Sync helpers (`: boolean`), union inference, `.select()` inference, request inference, and error generation are unchanged; unresolvable cases still fall back to `dynamic`.
+
 ## [1.23.0] - 2026-06-17
 
 ### Added

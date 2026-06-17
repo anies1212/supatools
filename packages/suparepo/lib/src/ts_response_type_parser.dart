@@ -151,6 +151,22 @@ class TsResponseTypeParser {
       type = kept.first;
     }
 
+    // `Promise<T>` (an awaited async helper's return type) → unwrap to `T`.
+    // Lets `await isEntitledUser(): Promise<boolean>` resolve like a sync
+    // `: boolean` helper instead of falling back to `dynamic`.
+    if (type.startsWith('Promise<') && type.endsWith('>')) {
+      final inner = type.substring('Promise<'.length, type.length - 1).trim();
+      final innerResolved = _resolveType(inner, interfaces, seen);
+      if (innerResolved == null) return null;
+      if (!nullable) return innerResolved;
+      return _ResolvedType(
+        nullable: true,
+        isList: innerResolved.isList,
+        dartScalarType: innerResolved.dartScalarType,
+        objectFields: innerResolved.objectFields,
+      );
+    }
+
     // Array forms: `Array<X>` and `X[]`.
     if (type.startsWith('Array<') && type.endsWith('>')) {
       final inner = type.substring(6, type.length - 1).trim();
@@ -437,6 +453,20 @@ class TsResponseTypeParser {
     Map<String, List<EfTableColumn>>? tableSchemas,
   ) {
     final expr = valueExpr.trim();
+
+    // `await <inner>` (awaited async helper) → resolve `<inner>`; its
+    // `Promise<T>` return type is unwrapped to `T` in `_resolveType`.
+    final awaited = RegExp(r'^await\s+([\s\S]+)$').firstMatch(expr);
+    if (awaited != null) {
+      return _resolveValueExpr(
+        awaited.group(1)!.trim(),
+        key,
+        symbols,
+        interfaces,
+        selectVars,
+        tableSchemas,
+      );
+    }
 
     // Boolean literal.
     if (expr == 'true' || expr == 'false') return _scalar('bool', false);

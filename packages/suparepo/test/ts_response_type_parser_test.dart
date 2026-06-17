@@ -157,6 +157,87 @@ export const handler = async (req) => {
         }
       });
 
+      test('unwraps Promise<T> from an awaited async helper (cross-file)', () {
+        // Mirrors generate_bond_daily/handler.ts: `const isPaid = await
+        // isEntitledUser(...)` where the helper is imported from _shared.
+        // The async helper returns `Promise<boolean>`; previously the
+        // cross-file return type resolved to `dynamic` instead of `bool`.
+        const handlerSource = '''
+export const handler = async (req) => {
+  const isPaid = await isEntitledUser(admin, auth.userId);
+  return jsonResponse({ is_paid: isPaid });
+};
+''';
+        const importedSources = '''
+export async function isEntitledUser(
+  admin: Admin,
+  userId: string,
+): Promise<boolean> {
+  return true;
+}
+''';
+        final result = parser.parse(
+          functionName: 'generate_bond_daily',
+          indexSource: handlerSource,
+          importedSources: importedSources,
+        );
+
+        expect(result, isNotNull);
+        expect(field(result!, 'is_paid').dartScalarType, 'bool');
+        expect(field(result, 'is_paid').isObject, isFalse);
+        expect(field(result, 'is_paid').isList, isFalse);
+      });
+
+      test('unwraps Promise<T> from an inline awaited async helper call', () {
+        // `await helper()` written directly as a field value (no intermediate
+        // const). Uses a non-`is_`/`has_` key so the name heuristic can't mask
+        // a regression: it must resolve via the unwrapped Promise<string>.
+        const handlerSource = '''
+export const handler = async (req) => {
+  return jsonResponse({ label: await resolveLabel(admin, auth.userId) });
+};
+''';
+        const importedSources = '''
+export async function resolveLabel(
+  admin: Admin,
+  userId: string,
+): Promise<string> {
+  return "x";
+}
+''';
+        final result = parser.parse(
+          functionName: 'resolve_label',
+          indexSource: handlerSource,
+          importedSources: importedSources,
+        );
+
+        expect(result, isNotNull);
+        expect(field(result!, 'label').dartScalarType, 'String');
+        expect(field(result, 'label').isList, isFalse);
+      });
+
+      test('sync helper return type is unaffected (no Promise unwrap)', () {
+        const handlerSource = '''
+export const handler = async (req) => {
+  const allDone = computeAllDone(rows);
+  return jsonResponse({ all_done: allDone });
+};
+''';
+        const importedSources = '''
+export function computeAllDone(rows: TodoRow[]): boolean {
+  return true;
+}
+''';
+        final result = parser.parse(
+          functionName: 'daily_todos',
+          indexSource: handlerSource,
+          importedSources: importedSources,
+        );
+
+        expect(result, isNotNull);
+        expect(field(result!, 'all_done').dartScalarType, 'bool');
+      });
+
       test('key present in all returns stays required', () {
         const source = '''
 export const handler = async (req) => {

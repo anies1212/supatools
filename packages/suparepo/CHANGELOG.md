@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.24.0] - 2026-06-26
+
+### Added
+
+- **Nullable columns in `result_models`.** YAML `result_models` column definitions now accept a `nullable: true` flag (`{ type: text, nullable: true }`). Nullable scalar columns are generated as optional `Type?` constructor parameters (declared after the `required` ones) and their `fromRow` casts become null-safe — `row['x'] as Type?` for scalars and `row['x'] != null ? DateTime.parse(row['x'] as String) : null` for `timestamptz`. The shorthand (`name: text`) and `{ type: text }` continue to default `nullable: false`. Error, nested-json, and json/`dynamic` columns are unaffected. This lets `RETURNS TABLE` functions — whose column nullability PostgreSQL cannot infer from `pg_proc` — declare an accurate null contract and avoid runtime cast crashes.
+
+### Changed
+
+- Requires `supabase_schema_core` ^1.9.0 (adds `RpcTableColumn.nullable`).
+
 ## [1.23.2] - 2026-06-17
 
 ### Fixed

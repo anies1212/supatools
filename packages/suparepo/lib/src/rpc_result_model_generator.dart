@@ -67,7 +67,15 @@ class RpcResultModelGenerator {
 
     final errClassName = hasErrorType ? errorClassName(func.name) : null;
 
-    for (final col in columns) {
+    // Declare required (non-null) columns first, then optional (nullable)
+    // ones, so the generated constructor keeps `required` params ahead of
+    // optional `Type?` params.
+    final orderedColumns = [
+      ...columns.where((c) => !_isOptional(c, hasErrorType)),
+      ...columns.where((c) => _isOptional(c, hasErrorType)),
+    ];
+
+    for (final col in orderedColumns) {
       final fieldName = ReCase(col.name).camelCase;
       final isErrorCol =
           hasErrorType && (col.name == 'error' || col.name == 'error_code');
@@ -84,7 +92,11 @@ class RpcResultModelGenerator {
       } else {
         dartType = TypeMapper.mapType(col.dataType);
       }
-      buffer.writeln('    required $dartType $fieldName,');
+      if (_isOptional(col, hasErrorType)) {
+        buffer.writeln('    $dartType? $fieldName,');
+      } else {
+        buffer.writeln('    required $dartType $fieldName,');
+      }
     }
 
     buffer.writeln('  }) = _$className;');
@@ -97,13 +109,14 @@ class RpcResultModelGenerator {
     );
     buffer.writeln('      $className(');
 
-    for (final col in columns) {
+    for (final col in orderedColumns) {
       final fieldName = ReCase(col.name).camelCase;
       final isErrorCol =
           hasErrorType && (col.name == 'error' || col.name == 'error_code');
       final isJson = TypeMapper.isJsonType(col.dataType);
       final hasNested =
           col.nestedColumns != null && col.nestedColumns!.isNotEmpty;
+      final isOptional = _isOptional(col, hasErrorType);
       if (isErrorCol) {
         buffer.writeln(
           "        $fieldName: "
@@ -135,13 +148,22 @@ class RpcResultModelGenerator {
       } else {
         final dartType = TypeMapper.mapType(col.dataType);
         if (dartType == 'DateTime') {
-          buffer.writeln(
-            "        $fieldName: "
-            "DateTime.parse(row['${col.name}'] as String),",
-          );
+          if (isOptional) {
+            buffer.writeln(
+              "        $fieldName: row['${col.name}'] != null"
+              " ? DateTime.parse(row['${col.name}'] as String)"
+              " : null,",
+            );
+          } else {
+            buffer.writeln(
+              "        $fieldName: "
+              "DateTime.parse(row['${col.name}'] as String),",
+            );
+          }
         } else {
+          final cast = isOptional ? '$dartType?' : dartType;
           buffer.writeln(
-            "        $fieldName: row['${col.name}'] as $dartType,",
+            "        $fieldName: row['${col.name}'] as $cast,",
           );
         }
       }
@@ -164,6 +186,21 @@ class RpcResultModelGenerator {
     }
 
     return buffer.toString();
+  }
+
+  /// Whether [col] should be rendered as an optional `Type?` field.
+  ///
+  /// Only plain scalar columns honour the `nullable` flag. Error, nested
+  /// json, and json/dynamic columns keep their existing (required) shape
+  /// since they already carry their own null-handling.
+  static bool _isOptional(RpcTableColumn col, bool hasErrorType) {
+    if (!col.nullable) return false;
+    final isErrorCol =
+        hasErrorType && (col.name == 'error' || col.name == 'error_code');
+    final hasNested =
+        col.nestedColumns != null && col.nestedColumns!.isNotEmpty;
+    final isJson = TypeMapper.isJsonType(col.dataType);
+    return !isErrorCol && !hasNested && !isJson;
   }
 
   /// Returns the class name for a nested json column model.

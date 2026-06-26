@@ -308,6 +308,78 @@ void main() {
     });
   });
 
+  group('nullable columns', () {
+    test('nullable scalar becomes Type? and is not required', () {
+      final func = RpcFunctionInfo(
+        name: 'list_cards_with_top_price',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'card_master_id', dataType: 'int8'),
+          RpcTableColumn(
+            name: 'image_url',
+            dataType: 'text',
+            nullable: true,
+          ),
+          RpcTableColumn(
+            name: 'top_price',
+            dataType: 'int4',
+            nullable: true,
+          ),
+          RpcTableColumn(name: 'store_count', dataType: 'int4'),
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      // non-null columns stay required
+      expect(output, contains('required int cardMasterId,'));
+      expect(output, contains('required int storeCount,'));
+      // nullable columns become optional Type?
+      expect(output, contains('String? imageUrl,'));
+      expect(output, contains('int? topPrice,'));
+      expect(output, isNot(contains('required String? imageUrl,')));
+      // required declared before optional
+      expect(
+        output.indexOf('required int storeCount,'),
+        lessThan(output.indexOf('String? imageUrl,')),
+      );
+      // fromRow uses null-safe casts
+      expect(output, contains("imageUrl: row['image_url'] as String?,"));
+      expect(output, contains("topPrice: row['top_price'] as int?,"));
+    });
+
+    test('nullable DateTime is null-safe in fromRow', () {
+      final func = RpcFunctionInfo(
+        name: 'get_card_comparison',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'store_id', dataType: 'int8'),
+          RpcTableColumn(
+            name: 'captured_at',
+            dataType: 'timestamptz',
+            nullable: true,
+          ),
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      expect(output, contains('DateTime? capturedAt,'));
+      expect(
+        output,
+        contains(
+          "capturedAt: row['captured_at'] != null"
+          " ? DateTime.parse(row['captured_at'] as String)"
+          " : null,",
+        ),
+      );
+    });
+  });
+
   group('generateAllResultModels', () {
     test('generates only for functions with tableColumns', () {
       final functions = [

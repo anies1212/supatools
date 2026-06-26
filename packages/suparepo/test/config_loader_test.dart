@@ -314,6 +314,57 @@ rpc:
       expect(stats[1].dataType, 'text');
     });
 
+    test('RPC result_models parses nullable flag', () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+  result_models:
+    list_cards_with_top_price:
+      card_master_id: { type: int8 }
+      image_url: { type: text, nullable: true }
+      top_price: { type: int4, nullable: true }
+      store_count: { type: int4 }
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      final cols = config!.rpc.resultModels!['list_cards_with_top_price']!;
+      expect(cols[0].name, 'card_master_id');
+      expect(cols[0].nullable, isFalse);
+      expect(cols[1].name, 'image_url');
+      expect(cols[1].nullable, isTrue);
+      expect(cols[2].name, 'top_price');
+      expect(cols[2].nullable, isTrue);
+      expect(cols[3].name, 'store_count');
+      expect(cols[3].nullable, isFalse);
+    });
+
+    test('RPC result_models shorthand defaults nullable to false',
+        () async {
+      final path = await writeConfig('''
+url: https://example.supabase.co
+secret_key: test-secret-key-long-enough
+rpc:
+  enabled: true
+  result_models:
+    get_stats:
+      total: int4
+''');
+
+      final loader = SuparepoConfigLoader(
+        envVars: const {},
+      );
+      final config = await loader.loadConfig(path);
+
+      final cols = config!.rpc.resultModels!['get_stats']!;
+      expect(cols[0].nullable, isFalse);
+    });
+
     test('generate_result_models defaults to false', () async {
       final path = await writeConfig('''
 url: https://example.supabase.co

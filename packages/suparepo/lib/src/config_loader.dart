@@ -76,7 +76,12 @@ class SuparepoConfigLoader extends BaseConfigLoader {
   ///   get_membership_rank_info:
   ///     rank: { type: text }
   ///     upload_days: { type: int4 }
+  ///     avatar_url: { type: text, nullable: true }
   /// ```
+  ///
+  /// The shorthand `name: text` (and `{ type: text }`) defaults
+  /// `nullable` to `false`. Set `{ type: text, nullable: true }` to mark
+  /// a column as null-allowing in the generated result model.
   Map<String, List<RpcTableColumn>>? _parseResultModels(dynamic value) {
     if (value == null || value is! YamlMap) return null;
 
@@ -93,9 +98,11 @@ class SuparepoConfigLoader extends BaseConfigLoader {
         final dataType = fieldDef is YamlMap
             ? (fieldDef['type']?.toString() ?? 'text')
             : fieldDef?.toString() ?? 'text';
+        final nullable = fieldDef is YamlMap && fieldDef['nullable'] == true;
         columns.add(RpcTableColumn(
           name: fieldName,
           dataType: dataType,
+          nullable: nullable,
         ));
       }
 

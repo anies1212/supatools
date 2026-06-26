@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.9.0] - 2026-06-26
+
+### Added
+
+- **`RpcTableColumn.nullable`** — new field (default `false`) marking whether a `RETURNS TABLE` column may be null in the result row. Introspection cannot infer nullability from `pg_proc`, so it stays `false` for introspected columns and is intended to be overridden via consumers' YAML `result_models` definitions. `toString()` now includes the flag.
+
 ## [1.8.0] - 2026-05-19
 
 ### Added

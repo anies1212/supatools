@@ -103,15 +103,24 @@ class RpcTableColumn {
   /// is a JSON array of objects rather than a single object.
   final bool isArray;
 
+  /// Whether this column may be null in the result row.
+  ///
+  /// Introspection cannot infer nullability of `RETURNS TABLE` columns
+  /// from `pg_proc`, so this defaults to `false` and is overridden via
+  /// the YAML `result_models` definition (`{ type: text, nullable: true }`).
+  final bool nullable;
+
   const RpcTableColumn({
     required this.name,
     required this.dataType,
     this.nestedColumns,
     this.isArray = false,
+    this.nullable = false,
   });
 
   @override
-  String toString() => 'RpcTableColumn($name: $dataType)';
+  String toString() =>
+      'RpcTableColumn($name: $dataType, nullable: $nullable)';
 }
 
 /// Represents a parameter for an RPC function

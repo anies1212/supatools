@@ -358,6 +358,51 @@ rpc:
       avatar_url: text
 ```
 
+#### Nullable columns
+
+`RETURNS TABLE` column nullability cannot be inferred from `pg_proc`, so columns
+are non-nullable by default. Mark a column with `nullable: true` to generate an
+optional `Type?` field with a null-safe `fromRow` cast:
+
+```yaml
+rpc:
+  enabled: true
+  generate_result_models: true
+  result_models:
+    list_cards_with_top_price:
+      card_master_id: { type: int8 }                    # required int
+      name_ja:        { type: text }                    # required String
+      image_url:      { type: text, nullable: true }    # String?
+      top_price:      { type: int4, nullable: true }    # int?
+      captured_at:    { type: timestamptz, nullable: true }  # DateTime?
+```
+
+generates (nullable fields come after the `required` ones):
+
+```dart
+const factory ListCardsWithTopPriceResult({
+  required int cardMasterId,
+  required String nameJa,
+  String? imageUrl,
+  int? topPrice,
+  DateTime? capturedAt,
+}) = _ListCardsWithTopPriceResult;
+
+factory ListCardsWithTopPriceResult.fromRow(Map<String, dynamic> row) =>
+    ListCardsWithTopPriceResult(
+      cardMasterId: row['card_master_id'] as int,
+      nameJa: row['name_ja'] as String,
+      imageUrl: row['image_url'] as String?,
+      topPrice: row['top_price'] as int?,
+      capturedAt: row['captured_at'] != null
+          ? DateTime.parse(row['captured_at'] as String)
+          : null,
+    );
+```
+
+The shorthand (`name: text`) and `{ type: text }` keep `nullable: false`.
+Error, nested-json, and `json`/`jsonb` (`dynamic`) columns ignore the flag.
+
 **Example:** For a SQL function:
 
 ```sql
@@ -897,6 +942,7 @@ rpc:
       rank: { type: text }
       upload_days: { type: int4 }
       is_active: { type: bool }
+      avatar_url: { type: text, nullable: true }  # optional Type? field
 
 # Edge Function client
 edge_functions:

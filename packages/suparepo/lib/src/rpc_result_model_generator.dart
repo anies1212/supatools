@@ -160,6 +160,17 @@ class RpcResultModelGenerator {
               "DateTime.parse(row['${col.name}'] as String),",
             );
           }
+        } else if (dartType == 'double') {
+          // float8/numeric arrive as JSON numbers that decode to `int`
+          // when the value is whole (e.g. `139`), so a direct `as double`
+          // cast throws. Go through `num` to coerce safely.
+          buffer.writeln(
+            isOptional
+                ? "        $fieldName: "
+                    "(row['${col.name}'] as num?)?.toDouble(),"
+                : "        $fieldName: "
+                    "(row['${col.name}'] as num).toDouble(),",
+          );
         } else {
           final cast = isOptional ? '$dartType?' : dartType;
           buffer.writeln(
@@ -247,6 +258,10 @@ class RpcResultModelGenerator {
         buffer.writeln(
           "        $fieldName: "
           "DateTime.parse(row['${col.name}'] as String),",
+        );
+      } else if (dartType == 'double') {
+        buffer.writeln(
+          "        $fieldName: (row['${col.name}'] as num).toDouble(),",
         );
       } else {
         buffer.writeln(

@@ -119,8 +119,7 @@ class RpcTableColumn {
   });
 
   @override
-  String toString() =>
-      'RpcTableColumn($name: $dataType, nullable: $nullable)';
+  String toString() => 'RpcTableColumn($name: $dataType, nullable: $nullable)';
 }
 
 /// Represents a parameter for an RPC function
@@ -332,6 +331,33 @@ class SchemaFetcher {
     return jsonDecode(response.body);
   }
 
+  /// Normalizes a raw `execute_sql` response into the row list produced
+  /// by an inner `SELECT json_agg(sub) FROM (...) sub` projection.
+  ///
+  /// Introspection queries wrap their projection in `json_agg(...)` so a
+  /// single value carries every row. Depending on how a project's
+  /// `execute_sql` returns data, this surfaces as one of two shapes:
+  ///
+  /// * `EXECUTE ... INTO result` (suparepo README default): the
+  ///   `json_agg` value is returned directly → `[ {row}, {row}, ... ]`.
+  /// * `jsonb_agg(t)` aggregating style (e.g. supatools:local / Dev / Prd
+  ///   helper that returns *all* rows of an arbitrary query): the single
+  ///   row is wrapped once more → `[ { "json_agg": [ {row}, ... ] } ]`.
+  ///
+  /// Unwrapping the second shape lets RPC/enum introspection work under
+  /// either `execute_sql` convention instead of throwing a cast error.
+  static List<dynamic> rowsFromAggregatedResponse(dynamic response) {
+    var value = response;
+    if (value is List &&
+        value.length == 1 &&
+        value.first is Map &&
+        (value.first as Map).length == 1 &&
+        (value.first as Map).containsKey('json_agg')) {
+      value = (value.first as Map)['json_agg'];
+    }
+    return value is List ? value : const <dynamic>[];
+  }
+
   /// Fetches the raw OpenAPI spec JSON from Supabase
   Future<Map<String, dynamic>> _fetchOpenApiSpec() async {
     final url = Uri.parse('$supabaseUrl/rest/v1/');
@@ -352,7 +378,7 @@ class SchemaFetcher {
       );
     }
 
-    final openApiUrl = Uri.parse('$supabaseUrl/rest/v1/?apikey=$supabaseKey');
+    final openApiUrl = Uri.parse('$supabaseUrl/rest/v1/');
     final openApiResponse = await http.get(
       openApiUrl,
       headers: {
@@ -403,8 +429,7 @@ class SchemaFetcher {
       try {
         final jsonColumnsMap = await _fetchRpcJsonColumns();
         merged = merged.map((func) {
-          if (func.tableColumns != null &&
-              func.tableColumns!.isNotEmpty) {
+          if (func.tableColumns != null && func.tableColumns!.isNotEmpty) {
             return func;
           }
           final columns = jsonColumnsMap[func.name];
@@ -510,6 +535,62 @@ class SchemaFetcher {
     return (functions: merged, resolvedCount: resolved);
   }
 
+  /// Applies user-defined `result_models` column overrides onto the
+  /// introspected RPC [functions].
+  ///
+  /// `result_models` is intended to *augment* introspected columns —
+  /// chiefly to set nullability and refine types, which cannot be
+  /// inferred from `pg_proc` (see [RpcTableColumn.nullable]). For each
+  /// function that has an override entry:
+  ///
+  /// * If introspection produced no `tableColumns`, the override columns
+  ///   are used as the full definition.
+  /// * Otherwise the introspected column order is preserved; a column
+  ///   named in the override adopts the override's `dataType`/`nullable`
+  ///   (keeping any introspected nested/array shape), and override
+  ///   columns with no introspected counterpart are appended.
+  ///
+  /// Functions without an override entry are returned unchanged.
+  static List<RpcFunctionInfo> applyResultModels(
+    List<RpcFunctionInfo> functions,
+    Map<String, List<RpcTableColumn>> resultModels,
+  ) {
+    return functions.map((func) {
+      final overrides = resultModels[func.name];
+      if (overrides == null) return func;
+
+      final introspected = func.tableColumns;
+      if (introspected == null || introspected.isEmpty) {
+        return func.copyWith(tableColumns: overrides);
+      }
+
+      final overrideByName = {for (final c in overrides) c.name: c};
+      final usedNames = <String>{};
+      final merged = <RpcTableColumn>[];
+      for (final col in introspected) {
+        final override = overrideByName[col.name];
+        if (override == null) {
+          merged.add(col);
+          continue;
+        }
+        usedNames.add(col.name);
+        merged.add(RpcTableColumn(
+          name: col.name,
+          dataType: override.dataType,
+          nestedColumns: col.nestedColumns,
+          isArray: col.isArray,
+          nullable: override.nullable,
+        ));
+      }
+      for (final override in overrides) {
+        if (!usedNames.contains(override.name)) {
+          merged.add(override);
+        }
+      }
+      return func.copyWith(tableColumns: merged);
+    }).toList();
+  }
+
   /// Emits a warning when a suspiciously high ratio of RPC functions
   /// resolved to `void` — usually a sign that catalog introspection
   /// silently failed (e.g. `execute_sql` is not installed, or the API
@@ -519,8 +600,7 @@ class SchemaFetcher {
     required bool introspectionAvailable,
   }) {
     if (functions.length < 3) return;
-    final voidCount =
-        functions.where((f) => f.returnType == 'void').length;
+    final voidCount = functions.where((f) => f.returnType == 'void').length;
     final ratio = voidCount / functions.length;
     if (ratio < 0.7) return;
     if (introspectionAvailable) {
@@ -567,7 +647,7 @@ class SchemaFetcher {
     final result = <String, ({String typeName, bool returnsSet})>{};
 
     // response is the json_agg result (a List), or null if no rows
-    final rows = response is List ? response : <dynamic>[];
+    final rows = rowsFromAggregatedResponse(response);
     for (final row in rows) {
       final name = row['function_name'] as String;
       final typeName = row['return_type'] as String;
@@ -635,7 +715,7 @@ class SchemaFetcher {
     final response = await _executeRawQuery(query);
     final result = <String, List<RpcTableColumn>>{};
 
-    final rows = response is List ? response : <dynamic>[];
+    final rows = rowsFromAggregatedResponse(response);
     for (final row in rows) {
       final funcName = row['function_name'] as String;
       final argModes = (row['arg_modes'] as List).cast<String>();
@@ -663,8 +743,7 @@ class SchemaFetcher {
   /// Fetches column info for `RETURNS json/jsonb` functions by
   /// parsing `json_build_object` / `jsonb_build_object` calls
   /// in the function body (`pg_proc.prosrc`).
-  Future<Map<String, List<RpcTableColumn>>>
-      _fetchRpcJsonColumns() async {
+  Future<Map<String, List<RpcTableColumn>>> _fetchRpcJsonColumns() async {
     final query = '''
       SELECT json_agg(sub) FROM (
         SELECT
@@ -682,7 +761,7 @@ class SchemaFetcher {
     final response = await _executeRawQuery(query);
     final result = <String, List<RpcTableColumn>>{};
 
-    final rows = response is List ? response : <dynamic>[];
+    final rows = rowsFromAggregatedResponse(response);
     for (final row in rows) {
       final funcName = row['function_name'] as String;
       final source = row['source'] as String;
@@ -894,13 +973,11 @@ class SchemaFetcher {
     }
 
     // NOT expr → bool
-    if (normalized.startsWith('not ') ||
-        normalized.startsWith('not(')) {
+    if (normalized.startsWith('not ') || normalized.startsWith('not(')) {
       return 'bool';
     }
     // EXISTS(...) → bool
-    if (normalized.startsWith('exists(') ||
-        normalized.startsWith('exists (')) {
+    if (normalized.startsWith('exists(') || normalized.startsWith('exists (')) {
       return 'bool';
     }
     // Boolean operators: expr AND/OR expr, expr IS NULL, etc.
@@ -938,7 +1015,8 @@ class SchemaFetcher {
   /// Fetches nested JSON column structures from function bodies
   /// for RETURNS TABLE functions with json/jsonb columns.
   Future<
-          Map<String, Map<String, ({List<RpcTableColumn> columns, bool isArray})>>>
+          Map<String,
+              Map<String, ({List<RpcTableColumn> columns, bool isArray})>>>
       _fetchRpcNestedJsonColumns() async {
     final query = '''
       SELECT json_agg(sub) FROM (
@@ -958,7 +1036,7 @@ class SchemaFetcher {
     final result =
         <String, Map<String, ({List<RpcTableColumn> columns, bool isArray})>>{};
 
-    final rows = response is List ? response : <dynamic>[];
+    final rows = rowsFromAggregatedResponse(response);
     for (final row in rows) {
       final funcName = row['function_name'] as String;
       final source = row['source'] as String;
@@ -978,8 +1056,7 @@ class SchemaFetcher {
   /// The alias is matched against RETURNS TABLE column names.
   static Map<String, ({List<RpcTableColumn> columns, bool isArray})>
       parseNestedJsonColumns(String source) {
-    final result =
-        <String, ({List<RpcTableColumn> columns, bool isArray})>{};
+    final result = <String, ({List<RpcTableColumn> columns, bool isArray})>{};
 
     // Build variable types map for type resolution
     final varTypes = _extractVariableTypes(source);
@@ -1014,8 +1091,7 @@ class SchemaFetcher {
       // Skip one more ')' for the json_agg closing paren
       var scanPos = argsEnd + 1;
       // Skip whitespace, ORDER BY, and the json_agg closing paren
-      while (scanPos < source.length &&
-          source[scanPos] != ')') {
+      while (scanPos < source.length && source[scanPos] != ')') {
         scanPos++;
       }
       scanPos++; // skip json_agg ')'
@@ -1083,7 +1159,7 @@ class SchemaFetcher {
     final response = await _executeRawQuery(query);
     final result = <String, List<String>>{};
 
-    final rows = response is List ? response : <dynamic>[];
+    final rows = rowsFromAggregatedResponse(response);
     for (final row in rows) {
       final funcName = row['function_name'] as String;
       final source = row['source'] as String;
@@ -1546,7 +1622,7 @@ class SchemaFetcher {
     ''';
 
     final response = await _executeRawQuery(query);
-    final rows = response is List ? response : <dynamic>[];
+    final rows = rowsFromAggregatedResponse(response);
     return rows.map((row) {
       final name = row['enum_name'] as String;
       final values = (row['enum_values'] as List).cast<String>();

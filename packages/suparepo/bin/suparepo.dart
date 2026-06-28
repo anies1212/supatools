@@ -337,14 +337,13 @@ Future<int> _generateRpcClient(SuparepoConfig config) async {
     '${filtered.map((f) => f.name).join(', ')}',
   );
 
-  // Merge YAML result_models into tableColumns
+  // Merge YAML result_models into tableColumns. result_models augments
+  // the introspected columns — mainly to set nullability/types that
+  // pg_proc cannot express — keeping any introspected columns the
+  // override does not mention.
   final resultModels = config.rpc.resultModels;
   if (resultModels != null) {
-    filtered = filtered.map((func) {
-      final columns = resultModels[func.name];
-      if (columns == null) return func;
-      return func.copyWith(tableColumns: columns);
-    }).toList();
+    filtered = SchemaFetcher.applyResultModels(filtered, resultModels);
     print(
       '📝 Applied result_models: '
       '${resultModels.keys.join(', ')}',

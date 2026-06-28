@@ -150,6 +150,38 @@ void main() {
       );
     });
 
+    test('float8 columns coerce through num to avoid int-cast crashes', () {
+      final func = RpcFunctionInfo(
+        name: 'get_card_comparison',
+        params: [],
+        returnType: 'jsonb',
+        returnsSetOf: true,
+        tableColumns: [
+          RpcTableColumn(name: 'latitude', dataType: 'float8'),
+          RpcTableColumn(
+            name: 'longitude',
+            dataType: 'float8',
+            nullable: true,
+          ),
+        ],
+      );
+
+      final output = generator.generateResultModel(func)!;
+
+      expect(output, contains('required double latitude,'));
+      expect(output, contains('double? longitude,'));
+      // Whole-number JSON values decode to int, so cast via num.
+      expect(
+        output,
+        contains("latitude: (row['latitude'] as num).toDouble(),"),
+      );
+      expect(
+        output,
+        contains("longitude: (row['longitude'] as num?)?.toDouble(),"),
+      );
+      expect(output, isNot(contains("as double?")));
+    });
+
     test('DateTime column type', () {
       final func = RpcFunctionInfo(
         name: 'get_events',

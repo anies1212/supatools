@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [suparepo 1.25.0 / supabase_schema_core 1.10.0 / supafreeze 2.2.1] - 2026-06-28
+
+### Fixed
+
+- **supabase_schema_core**: RPC return-type introspection no longer aborts with `Failed to fetch OpenAPI spec (HTTP 400)`. The OpenAPI request appended `?apikey=<key>` to the URL, which PostgREST parsed as a column filter (`PGRST100`, "failed to parse filter"); the key is already sent as a header, so the redundant query parameter is dropped. Without this, RPC result models could not be regenerated at all (the fetch threw before any RPC was processed).
+- **supabase_schema_core**: RPC and enum catalog introspection now work with an aggregating `execute_sql` — one that wraps an arbitrary query in `jsonb_agg(t)` so it returns *every* row (the form used for table/enum introspection and by environments like Supabase local), not only the README's `EXECUTE ... INTO` single-row form. The introspection queries already wrap their projection in `json_agg(sub)`, so an aggregating `execute_sql` double-wrapped the result as `[{"json_agg": [...]}]` and threw `type 'Null' is not a subtype of type 'String'`, silently degrading every RETURNS TABLE function to `void`. Responses are now normalized for both conventions (`SchemaFetcher.rowsFromAggregatedResponse`).
+- **suparepo**: `float8` / `double precision` / `numeric` result columns are cast through `num` (`(row['x'] as num).toDouble()`) instead of `as double`. Whole-number JSON values decode to `int`, so the previous direct cast threw at runtime in `fromRow`.
+
+### Changed
+
+- **suparepo**: `result_models` now **augments** introspected columns instead of replacing them (`SchemaFetcher.applyResultModels`). A column named in the override adopts its `type` / `nullable`; introspected columns the override does not mention are **kept** (previously they were dropped). This matches the documented intent — the override exists mainly to declare nullability, which `pg_proc` cannot express. If you relied on `result_models` to prune introspected columns, list the exact columns you want, or use `rpc.exclude`. When introspection yields no columns, the override is still used as the full definition.
+
+### Added
+
+- **supabase_schema_core**: `SchemaFetcher.rowsFromAggregatedResponse` and `SchemaFetcher.applyResultModels` static helpers, with unit tests.
+
 ## [suparepo 1.23.0] - 2026-06-17
 
 ### Added

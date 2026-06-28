@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.25.0] - 2026-06-28
+
+### Changed
+
+- **`result_models` now augments introspected columns instead of replacing them.** A column named in the override adopts its `type` / `nullable`; introspected columns the override does not mention are **kept** (previously they were silently dropped). This matches the documented intent — the override exists mainly to declare nullability, which `pg_proc` cannot express. If you relied on `result_models` to prune introspected columns, list the exact columns you want or use `rpc.exclude`. When introspection yields no columns, the override is still used as the full definition. (Implemented via `SchemaFetcher.applyResultModels`.)
+
+### Fixed
+
+- **`float8` / `double precision` / `numeric` columns no longer crash `fromRow`.** They are cast through `num` (`(row['x'] as num).toDouble()`) instead of `as double`; whole-number JSON values decode to `int`, which the old direct cast rejected at runtime.
+- Picks up `supabase_schema_core` 1.10.0, which fixes the OpenAPI 400 abort and `execute_sql` double-wrap that previously prevented RPC result models from regenerating.
+
+### Requires
+
+- `supabase_schema_core: ^1.10.0`.
+
 ## [1.24.0] - 2026-06-26
 
 ### Added

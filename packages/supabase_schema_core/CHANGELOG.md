@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.10.0] - 2026-06-28
+
+### Fixed
+
+- **OpenAPI spec fetch no longer fails with HTTP 400.** The request appended `?apikey=<key>` to `/rest/v1/`, which PostgREST parsed as a column filter (`PGRST100`). The key is already sent as a header, so the redundant query parameter is dropped. This previously aborted all RPC return-type introspection.
+- **Catalog introspection works with an aggregating `execute_sql`.** RPC/enum introspection queries wrap their projection in `json_agg(sub)`; an `execute_sql` that itself aggregates rows with `jsonb_agg(t)` (rather than the README's `EXECUTE ... INTO` single-row form) double-wrapped the result as `[{"json_agg": [...]}]`, throwing `type 'Null' is not a subtype of type 'String'`. Responses are now normalized for both conventions.
+
+### Added
+
+- **`SchemaFetcher.rowsFromAggregatedResponse`** — normalizes a raw `execute_sql` response into the inner `json_agg` row list under either `execute_sql` convention.
+- **`SchemaFetcher.applyResultModels`** — merges consumer `result_models` column overrides onto introspected RPC columns (overrides set type/nullability; unmentioned introspected columns are retained).
+
 ## [1.9.0] - 2026-06-26
 
 ### Added

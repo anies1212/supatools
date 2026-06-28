@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [supabase_schema_core 1.10.1 / supafreeze 2.2.2] - 2026-06-28
+
+### Fixed
+
+- **supabase_schema_core**: OpenAPI-based table introspection (now reached after the 1.10.0 OpenAPI-fetch fix) misreported column nullability and defaults, so supafreeze emitted `required` for NOT NULL columns that have a default instead of `@Default(...)`. Two causes:
+  - PostgREST omits NOT NULL columns that carry a default from the schema's `required` list (they are optional on insert), so `!required.contains(col)` alone marked them nullable. A column with a default is now treated as non-nullable.
+  - PostgREST surfaces a string default `'JPY'::text` as the bare value `JPY`, but downstream parsing expects the single-quoted PG-literal form. String defaults are now normalized to `'JPY'`; expression defaults (`gen_random_uuid()`, `now()`) stay unquoted so they are correctly treated as non-literal (column stays `required`).
+- **supafreeze**: picks up the above via `supabase_schema_core` 1.10.1.
+
+This is a follow-up to 1.10.0, which enabled the previously-dead OpenAPI table path without these refinements.
+
 ## [suparepo 1.25.0 / supabase_schema_core 1.10.0 / supafreeze 2.2.1] - 2026-06-28
 
 ### Fixed

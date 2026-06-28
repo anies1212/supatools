@@ -402,7 +402,7 @@ class SchemaFetcher {
   /// Fetches schema via OpenAPI spec (fallback method)
   Future<List<TableInfo>> _fetchViaOpenApi() async {
     final spec = await _fetchOpenApiSpec();
-    return _parseOpenApiSpec(spec);
+    return parseOpenApiSpec(spec);
   }
 
   /// Fetches RPC function definitions from the OpenAPI spec.
@@ -1422,7 +1422,30 @@ class SchemaFetcher {
   }
 
   /// Parses OpenAPI specification to extract table information
-  List<TableInfo> _parseOpenApiSpec(Map<String, dynamic> spec) {
+  /// Converts an OpenAPI `default` value into the PostgreSQL default
+  /// expression form that consumers (e.g. supafreeze's `_parseDefaultValue`)
+  /// expect, matching the information_schema `column_default` shape.
+  ///
+  /// PostgREST exposes literal defaults as JSON values: a string default
+  /// `'ja'::text` is surfaced as the bare string `ja`, a boolean as `true`,
+  /// a number as `5`. Downstream parsing expects string literals to be
+  /// single-quoted (`'ja'`), so wrap plain strings accordingly (escaping
+  /// embedded quotes); booleans/numbers pass through unchanged.
+  ///
+  /// Expression defaults (e.g. `gen_random_uuid()`, `now()`) are also
+  /// surfaced as strings but must stay unquoted so consumers recognize them
+  /// as non-literal (and emit `required` rather than a bogus `@Default`),
+  /// matching the information_schema `column_default` form.
+  static String? _openApiDefaultToPgLiteral(dynamic rawDefault) {
+    if (rawDefault == null) return null;
+    if (rawDefault is! String) return rawDefault.toString();
+    final value = rawDefault.trim();
+    // Function / expression call: leave as-is (unquoted).
+    if (value.contains('(') && value.endsWith(')')) return value;
+    return "'${value.replaceAll("'", "''")}'";
+  }
+
+  List<TableInfo> parseOpenApiSpec(Map<String, dynamic> spec) {
     final tables = <TableInfo>[];
     final definitions = spec['definitions'] as Map<String, dynamic>? ??
         spec['components']?['schemas'] as Map<String, dynamic>? ??
@@ -1462,12 +1485,19 @@ class SchemaFetcher {
         final fkKey = '$tableName.$columnName';
         final foreignKey = foreignKeys[fkKey];
 
+        // PostgREST omits NOT NULL columns that have a default from the
+        // `required` list (they are optional on insert), so `required`
+        // alone would mark a defaulted NOT NULL column as nullable. A
+        // column with a default is never null in a result row, so treat
+        // the presence of a default as non-nullable — matching the
+        // information_schema path and letting consumers emit `@Default`.
+        final rawDefault = columnSchema['default'];
         columns.add(
           ColumnInfo(
             name: columnName,
             dataType: dataType,
-            isNullable: !required.contains(columnName),
-            defaultValue: columnSchema['default']?.toString(),
+            isNullable: !required.contains(columnName) && rawDefault == null,
+            defaultValue: _openApiDefaultToPgLiteral(rawDefault),
             foreignKey: foreignKey,
           ),
         );

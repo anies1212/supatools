@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.2] - 2026-06-28
+
+### Fixed
+
+- Picks up `supabase_schema_core` 1.10.1: NOT NULL columns with a default again generate `@Default(...)` (instead of `required`) when the schema is read via the OpenAPI path, and expression defaults like `gen_random_uuid()` correctly stay `required`. Fixes a regression introduced when 1.10.0 first enabled the OpenAPI table path.
+
+### Requires
+
+- `supabase_schema_core: ^1.10.1`.
+
 ## [2.2.1] - 2026-06-28
 
 ### Fixed

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.1] - 2026-06-28
+
+### Fixed
+
+- **OpenAPI table introspection now reports defaults/nullability correctly.** Follow-up to 1.10.0, which first made the OpenAPI table path reachable.
+  - A NOT NULL column with a default is no longer marked nullable. PostgREST omits such columns from the `required` list (they are optional on insert), so `!required.contains(col)` alone was wrong; the presence of a default now also implies non-nullable.
+  - String defaults are normalized to the single-quoted PG-literal form (`JPY` → `'JPY'`) so consumers that parse `column_default` recognize them. Expression defaults (`gen_random_uuid()`, `now()`) stay unquoted and are treated as non-literal.
+
 ## [1.10.0] - 2026-06-28
 
 ### Fixed

@@ -2,6 +2,7 @@ import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'config_loader.dart';
 import 'enum_generator.dart';
+import 'model_generator.dart';
 
 /// Dart reserved words that cannot be used as identifiers
 /// https://dart.dev/language/keywords
@@ -25,9 +26,15 @@ const Set<String> _dartReservedWords = {
 };
 
 /// Generates Freezed model code from table information
-class FreezedGenerator {
+class FreezedGenerator implements ModelGenerator {
   /// File extension for generated files (without leading dot)
   static const String fileExtension = 'supafreeze';
+
+  @override
+  List<String> outputFileNames(String tableName) {
+    final base = '${ReCase(tableName).snakeCase}.$fileExtension';
+    return ['$base.dart', '$base.freezed.dart', '$base.g.dart'];
+  }
 
   /// All tables in the schema (used for relation lookups)
   final Map<String, TableInfo> _allTables = {};
@@ -36,6 +43,7 @@ class FreezedGenerator {
   SupafreezeConfig? _config;
 
   /// Sets all tables for relation lookup
+  @override
   void setAllTables(List<TableInfo> tables) {
     _allTables.clear();
     for (final table in tables) {
@@ -44,21 +52,25 @@ class FreezedGenerator {
   }
 
   /// Sets the configuration for relation embedding
+  @override
   void setConfig(SupafreezeConfig config) {
     _config = config;
   }
 
   /// Enum import prefix relative to model output directory.
   /// Set by the builder/CLI when enum generation is enabled.
+  @override
   String? enumImportPrefix;
 
   /// Gets the class name for a table
+  @override
   String getClassName(String tableName) {
     final rawClassName = ReCase(tableName).pascalCase;
     return _escapeClassName(rawClassName);
   }
 
   /// Generates a Freezed model file content for a single table
+  @override
   String generateModel(TableInfo table) {
     final rawClassName = ReCase(table.name).pascalCase;
     final className = _escapeClassName(rawClassName);
@@ -504,11 +516,13 @@ class FreezedGenerator {
   }
 
   /// Gets the generated file name for a table
+  @override
   String getFileName(String tableName) {
     return '${ReCase(tableName).snakeCase}.$fileExtension.dart';
   }
 
   /// Generates a barrel file that exports all models
+  @override
   String generateBarrelFile(List<TableInfo> tables, String outputDir) {
     final buffer = StringBuffer();
     buffer.writeln('// coverage:ignore-file');

@@ -1,8 +1,9 @@
 name: supafreeze
 description: >-
-  Generate Freezed models from Supabase database schema automatically.
-  Supports incremental generation, smart caching, and build_runner integration.
-version: 2.2.2
+  Generate Freezed or dart_mappable models from Supabase database schema
+  automatically. Supports incremental generation, smart caching, and
+  build_runner integration.
+version: 2.3.0
 homepage: https://github.com/anies1212/supatools
 repository: https://github.com/anies1212/supatools/tree/main/packages/supafreeze
 issue_tracker: https://github.com/anies1212/supatools/issues
@@ -12,9 +13,9 @@ resolution: workspace
 topics:
   - supabase
   - freezed
+  - dart-mappable
   - code-generation
   - build-runner
-  - postgresql
 
 environment:
   sdk: ^3.5.0

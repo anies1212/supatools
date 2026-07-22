@@ -4,7 +4,8 @@ import 'dart:io';
 import 'package:build/build.dart';
 import 'package:path/path.dart' as p;
 import 'package:supabase_schema_core/supabase_schema_core.dart';
-import 'freezed_generator.dart';
+import 'config_loader.dart';
+import 'model_generator.dart';
 
 /// PostProcessBuilder that generates individual model files from cached schema
 ///
@@ -32,6 +33,7 @@ class SupafreezePostBuilder implements PostProcessBuilder {
 
     final outputDir = data['outputDir'] as String? ?? 'lib/models';
     final generateBarrel = data['generateBarrel'] as bool? ?? false;
+    final modelFormat = ModelFormat.parse(data['modelFormat'] as String?);
     final tablesJson = data['tables'] as List<dynamic>?;
 
     if (tablesJson == null || tablesJson.isEmpty) {
@@ -61,7 +63,9 @@ class SupafreezePostBuilder implements PostProcessBuilder {
     }).toList();
 
     // Generate individual model files
-    final generator = FreezedGenerator();
+    final generator = createModelGenerator(
+      SupafreezeConfig(output: outputDir, modelFormat: modelFormat),
+    );
     final dir = Directory(outputDir);
     if (!await dir.exists()) {
       await dir.create(recursive: true);

@@ -57,7 +57,14 @@ export 'package:supabase_schema_core/supabase_schema_core.dart'
 
 // Supafreeze-specific exports
 export 'src/config_loader.dart'
-    show ConfigLoader, SupafreezeConfig, RelationConfig, RelationOverride;
+    show
+        ConfigLoader,
+        SupafreezeConfig,
+        RelationConfig,
+        RelationOverride,
+        ModelFormat;
 export 'src/enum_generator.dart' show EnumGenerator;
 export 'src/freezed_generator.dart' show FreezedGenerator;
+export 'src/dart_mappable_generator.dart' show DartMappableGenerator;
+export 'src/model_generator.dart' show ModelGenerator, createModelGenerator;
 export 'src/schema_cache.dart' show SchemaCache, SchemaDiff;

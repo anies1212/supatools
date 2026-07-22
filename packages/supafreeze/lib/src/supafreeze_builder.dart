@@ -2,12 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'package:build/build.dart';
 import 'package:path/path.dart' as p;
-import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'config_loader.dart';
 import 'enum_generator.dart';
 import 'schema_cache.dart';
-import 'freezed_generator.dart';
+import 'model_generator.dart';
 
 /// Builder that fetches Supabase schema and outputs intermediate JSON
 ///
@@ -180,7 +179,7 @@ class SupafreezeBuilder implements Builder {
           );
 
           // Generate enum files
-          final enumGen = EnumGenerator();
+          final enumGen = EnumGenerator(format: config.modelFormat);
           final enumDir = Directory(config.resolvedEnumOutput);
           if (!await enumDir.exists()) {
             await enumDir.create(recursive: true);
@@ -262,7 +261,7 @@ class SupafreezeBuilder implements Builder {
     SupafreezeConfig config,
     SchemaCache cache,
   ) async {
-    final generator = FreezedGenerator();
+    final generator = createModelGenerator(config);
     final outputDir = config.output;
 
     // Get all current tables for relation lookup
@@ -270,7 +269,6 @@ class SupafreezeBuilder implements Builder {
 
     // Configure generator with all tables and config for relation embedding
     generator.setAllTables(allTables);
-    generator.setConfig(config);
 
     // Set enum import prefix if enum generation is enabled
     if (config.generateEnums && TypeMapper.useEnumTypes) {
@@ -295,7 +293,7 @@ class SupafreezeBuilder implements Builder {
 
     // Remove files for deleted tables
     for (final tableName in diff.tablesToRemove) {
-      await _removeTableFiles(outputDir, tableName);
+      await _removeTableFiles(outputDir, tableName, generator);
       await cache.removeTableHash(tableName);
     }
 
@@ -359,17 +357,13 @@ class SupafreezeBuilder implements Builder {
   }
 
   /// Removes model files for a specific table
-  Future<void> _removeTableFiles(String outputDir, String tableName) async {
-    final baseName =
-        '${ReCase(tableName).snakeCase}.${FreezedGenerator.fileExtension}';
-
-    final files = [
-      File(p.join(outputDir, '$baseName.dart')),
-      File(p.join(outputDir, '$baseName.freezed.dart')),
-      File(p.join(outputDir, '$baseName.g.dart')),
-    ];
-
-    for (final file in files) {
+  Future<void> _removeTableFiles(
+    String outputDir,
+    String tableName,
+    ModelGenerator generator,
+  ) async {
+    for (final fileName in generator.outputFileNames(tableName)) {
+      final file = File(p.join(outputDir, fileName));
       if (await file.exists()) {
         await file.delete();
         log.info('Removed: ${file.path}');

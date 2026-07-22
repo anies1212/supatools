@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 import 'package:supafreeze/src/config_loader.dart';
 import 'package:supafreeze/src/schema_cache.dart';
-import 'package:supafreeze/src/freezed_generator.dart';
+import 'package:supafreeze/src/model_generator.dart';
 import 'package:supafreeze/src/enum_generator.dart';
 import 'package:path/path.dart' as p;
 
@@ -139,7 +139,7 @@ void main(List<String> args) async {
 
   // Generate enum files if enabled
   if (config.generateEnums && pgEnums.isNotEmpty) {
-    final enumGen = EnumGenerator();
+    final enumGen = EnumGenerator(format: config.modelFormat);
     final enumDir = Directory(config.resolvedEnumOutput);
     if (!await enumDir.exists()) {
       await enumDir.create(recursive: true);
@@ -160,11 +160,10 @@ void main(List<String> args) async {
   }
 
   // Generate models
-  final generator = FreezedGenerator();
+  final generator = createModelGenerator(config);
   final outputDir = config.output;
 
   generator.setAllTables(filteredTables);
-  generator.setConfig(config);
 
   // Set enum import prefix for FreezedGenerator
   if (config.generateEnums && TypeMapper.useEnumTypes) {
@@ -267,17 +266,10 @@ List<TableInfo> _addTablesWithEnums(
 Future<void> _removeTableFiles(
   String outputDir,
   String tableName,
-  FreezedGenerator generator,
+  ModelGenerator generator,
 ) async {
-  final baseName = generator.getFileName(tableName).replaceAll('.dart', '');
-
-  final files = [
-    File(p.join(outputDir, '$baseName.dart')),
-    File(p.join(outputDir, '$baseName.freezed.dart')),
-    File(p.join(outputDir, '$baseName.g.dart')),
-  ];
-
-  for (final file in files) {
+  for (final fileName in generator.outputFileNames(tableName)) {
+    final file = File(p.join(outputDir, fileName));
     if (await file.exists()) {
       await file.delete();
     }

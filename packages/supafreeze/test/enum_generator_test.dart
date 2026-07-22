@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
+import 'package:supafreeze/src/config_loader.dart';
 import 'package:supafreeze/src/enum_generator.dart';
 
 void main() {
@@ -161,6 +162,43 @@ void main() {
           contains("export 'order_status.supafreeze.dart';"),
         );
         expect(result, contains('// GENERATED CODE'));
+      });
+    });
+
+    group('dart_mappable format', () {
+      late EnumGenerator mappableGen;
+
+      setUp(() {
+        mappableGen = EnumGenerator(format: ModelFormat.dartMappable);
+      });
+
+      test('generates a @MappableEnum with mapper part', () {
+        final result = mappableGen.generateEnumFile(
+          EnumInfo(name: 'campaign_type', values: ['normal', 'trial']),
+        );
+
+        expect(
+          result,
+          contains("import 'package:dart_mappable/dart_mappable.dart';"),
+        );
+        expect(
+          result,
+          contains("part 'campaign_type.supafreeze.mapper.dart';"),
+        );
+        expect(result, contains('@MappableEnum()'));
+        expect(result, contains('enum CampaignType {'));
+        expect(result, contains('normal,'));
+        expect(result, contains('trial;'));
+      });
+
+      test('adds @MappableValue when the identifier differs', () {
+        final result = mappableGen.generateEnumFile(
+          EnumInfo(name: 'state', values: ['in-progress', 'done']),
+        );
+
+        expect(result, contains("@MappableValue('in-progress')"));
+        expect(result, contains('inProgress,'));
+        expect(result, contains('done;'));
       });
     });
   });

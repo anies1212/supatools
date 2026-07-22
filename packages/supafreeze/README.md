@@ -5,7 +5,7 @@ Generate [Freezed](https://pub.dev/packages/freezed) models from your Supabase d
 ## Features
 
 - Fetches table schema directly from Supabase PostgreSQL database
-- Generates type-safe Freezed models with `fromJson`/`toJson`
+- Generates type-safe models with `fromJson`/`toJson` — **Freezed** or **dart_mappable** (`model_format`)
 - **CLI tool** for syncing schema changes
 - **Smart caching** - only regenerates when DB schema changes
 - **Relation embedding** - auto-detects foreign keys and embeds related models
@@ -133,6 +133,7 @@ secret_key: ${SUPABASE_SECRET_KEY}  # Supabase service role key
 output: lib/models             # Output directory (default: lib/models)
 schema: public                 # PostgreSQL schema (default: public)
 fetch: always                  # Fetch mode: always | if_no_cache | never
+model_format: freezed          # Model style: freezed | dart_mappable (default: freezed)
 generate_barrel: false         # Generate models.dart barrel file
 embed_relations: false         # Auto-embed related models via FK
 
@@ -172,6 +173,41 @@ secret_key: $dotenv{SUPABASE_SECRET_KEY}
 | `always` | Always fetch from database (default) |
 | `if_no_cache` | Only fetch if no cache exists |
 | `never` | Never fetch, always use cache (offline mode) |
+
+### Model Format
+
+By default supafreeze generates [Freezed](https://pub.dev/packages/freezed)
+models. Set `model_format: dart_mappable` to generate
+[dart_mappable](https://pub.dev/packages/dart_mappable) models instead.
+
+```yaml
+model_format: dart_mappable
+```
+
+Both formats expose the **same JSON API** —
+`factory X.fromJson(Map<String, dynamic>)` and a `Map<String, dynamic> toJson()`
+— so [suparepo](https://pub.dev/packages/suparepo) repositories work unchanged
+with either format. The dart_mappable models omit the mixin's `toJson`/`toMap`
+(via `generateMethods`) and provide their own `Map`-returning `toJson()`, while
+still inheriting `copyWith`, `==`, `hashCode`, and `toString` from
+dart_mappable.
+
+Update your dependencies for the dart_mappable toolchain:
+
+```yaml
+dependencies:
+  dart_mappable: ^4.2.0
+
+dev_dependencies:
+  supafreeze: ^2.3.0
+  build_runner: ^2.4.0
+  dart_mappable_builder: ^4.2.0
+```
+
+The generation workflow is identical (`dart run supafreeze:supafreeze` then
+`dart run build_runner build`); build_runner emits `*.mapper.dart` part files
+instead of `*.freezed.dart` / `*.g.dart`. When `generate_enums` is enabled the
+enums are generated as `@MappableEnum` types.
 
 ## GitHub Actions
 

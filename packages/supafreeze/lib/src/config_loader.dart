@@ -2,6 +2,29 @@ import 'dart:io';
 import 'package:yaml/yaml.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
 
+/// Model code style that supafreeze generates.
+enum ModelFormat {
+  /// Freezed models (`@freezed`, `part '*.freezed.dart'`).
+  freezed,
+
+  /// dart_mappable models (`@MappableClass`, `part '*.mapper.dart'`).
+  dartMappable;
+
+  /// Parses a `model_format` YAML value. Unknown/empty values fall back to
+  /// [ModelFormat.freezed] to preserve the historical default.
+  static ModelFormat parse(String? value) {
+    switch (value?.trim().toLowerCase()) {
+      case 'dart_mappable':
+      case 'dart-mappable':
+      case 'dartmappable':
+      case 'mappable':
+        return ModelFormat.dartMappable;
+      default:
+        return ModelFormat.freezed;
+    }
+  }
+}
+
 /// Loads and resolves configuration from various sources
 class ConfigLoader extends BaseConfigLoader {
   ConfigLoader({
@@ -40,6 +63,7 @@ class ConfigLoader extends BaseConfigLoader {
       enumOutput: yaml['enum_output']?.toString(),
       preserveColumnOrder: yaml['preserve_column_order'] == true,
       generateInsertModels: yaml['generate_insert_models'] == true,
+      modelFormat: ModelFormat.parse(yaml['model_format']?.toString()),
     );
   }
 
@@ -158,6 +182,10 @@ class SupafreezeConfig extends BaseSupabaseConfig {
   /// safety. Additive and opt-in (default false).
   final bool generateInsertModels;
 
+  /// Which model code style to generate. Defaults to [ModelFormat.freezed]
+  /// so existing projects keep generating Freezed models unchanged.
+  final ModelFormat modelFormat;
+
   const SupafreezeConfig({
     super.url,
     super.secretKey,
@@ -173,6 +201,7 @@ class SupafreezeConfig extends BaseSupabaseConfig {
     this.enumOutput,
     this.preserveColumnOrder = false,
     this.generateInsertModels = false,
+    this.modelFormat = ModelFormat.freezed,
   });
 
   /// Gets the resolved enum output directory

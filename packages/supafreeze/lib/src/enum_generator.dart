@@ -1,5 +1,6 @@
 import 'package:recase/recase.dart';
 import 'package:supabase_schema_core/supabase_schema_core.dart';
+import 'config_loader.dart';
 
 /// Dart reserved words that cannot be used as enum value identifiers
 const Set<String> _dartReservedWords = {
@@ -24,6 +25,12 @@ class EnumGenerator {
   /// File extension for generated enum files
   static const String fileExtension = 'supafreeze';
 
+  /// Model format the enums are generated for. Freezed uses a plain enhanced
+  /// enum; dart_mappable uses an `@MappableEnum`.
+  final ModelFormat format;
+
+  EnumGenerator({this.format = ModelFormat.freezed});
+
   /// Gets the Dart enum class name from a PostgreSQL enum type name.
   ///
   /// e.g. `campaign_type` → `CampaignType`
@@ -37,7 +44,13 @@ class EnumGenerator {
       '${ReCase(pgEnumName).snakeCase}.$fileExtension.dart';
 
   /// Generates a Dart enum file for a single PostgreSQL enum type.
-  String generateEnumFile(EnumInfo enumInfo) {
+  String generateEnumFile(EnumInfo enumInfo) => switch (format) {
+        ModelFormat.freezed => _generateFreezedEnumFile(enumInfo),
+        ModelFormat.dartMappable => _generateMappableEnumFile(enumInfo),
+      };
+
+  /// Plain enhanced enum with a string `value` and `toJson`/`fromJson`.
+  String _generateFreezedEnumFile(EnumInfo enumInfo) {
     final className = getEnumClassName(enumInfo.name);
     final buffer = StringBuffer();
 
@@ -74,6 +87,45 @@ class EnumGenerator {
     buffer.writeln(
       '      values.firstWhere((e) => e.value == json);',
     );
+    buffer.writeln('}');
+
+    return buffer.toString();
+  }
+
+  /// dart_mappable enum annotated with `@MappableEnum`. Values whose Dart
+  /// identifier differs from the PostgreSQL value carry a `@MappableValue`
+  /// override so the exact database string is preserved.
+  String _generateMappableEnumFile(EnumInfo enumInfo) {
+    final className = getEnumClassName(enumInfo.name);
+    final fileName = ReCase(enumInfo.name).snakeCase;
+    final buffer = StringBuffer();
+
+    buffer.writeln('// coverage:ignore-file');
+    buffer.writeln('// GENERATED CODE - DO NOT MODIFY BY HAND');
+    buffer.writeln('// ignore_for_file: type=lint');
+    buffer.writeln(
+      '// ignore_for_file: public_member_api_docs, '
+      'constant_identifier_names, lines_longer_than_80_chars, '
+      'directives_ordering',
+    );
+    buffer.writeln();
+    buffer.writeln("import 'package:dart_mappable/dart_mappable.dart';");
+    buffer.writeln();
+    buffer.writeln("part '$fileName.$fileExtension.mapper.dart';");
+    buffer.writeln();
+    buffer.writeln('@MappableEnum()');
+    buffer.writeln('enum $className {');
+
+    for (var i = 0; i < enumInfo.values.length; i++) {
+      final pgValue = enumInfo.values[i];
+      final dartName = _sanitizeEnumValue(pgValue);
+      final comma = i < enumInfo.values.length - 1 ? ',' : ';';
+      if (dartName != pgValue) {
+        buffer.writeln("  @MappableValue('$pgValue')");
+      }
+      buffer.writeln('  $dartName$comma');
+    }
+
     buffer.writeln('}');
 
     return buffer.toString();

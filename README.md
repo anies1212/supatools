@@ -7,18 +7,20 @@ A monorepo containing Dart packages for Supabase code generation.
 | Package | Description | pub.dev |
 |---------|-------------|---------|
 | [supabase_schema_core](packages/supabase_schema_core) | Internal package for schema fetching and type mapping | [![pub](https://img.shields.io/pub/v/supabase_schema_core.svg)](https://pub.dev/packages/supabase_schema_core) |
-| [supafreeze](packages/supafreeze) | Generate Freezed models from Supabase schema | [![pub](https://img.shields.io/pub/v/supafreeze.svg)](https://pub.dev/packages/supafreeze) |
+| [supafreeze](packages/supafreeze) | Generate Freezed or dart_mappable models from Supabase schema | [![pub](https://img.shields.io/pub/v/supafreeze.svg)](https://pub.dev/packages/supafreeze) |
 | [suparepo](packages/suparepo) | Generate repositories, RPC clients, and Edge Function clients | [![pub](https://img.shields.io/pub/v/suparepo.svg)](https://pub.dev/packages/suparepo) |
 
 ## Quick Start
 
-### Generate Freezed Models
+### Generate Models (Freezed or dart_mappable)
 
 ```bash
 dart pub add supafreeze
 ```
 
-See [supafreeze README](packages/supafreeze/README.md) for details.
+Generates Freezed models by default; set `model_format: dart_mappable` in
+`supafreeze.yaml` to generate dart_mappable models instead. See the
+[supafreeze README](packages/supafreeze/README.md) for details.
 
 ### Generate Repositories, RPC & Edge Function Clients
 
